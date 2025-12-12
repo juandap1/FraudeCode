@@ -8,5 +8,18 @@
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "chromadb": "^3.1.7",
+    "ink-big-text": "^2.0.0",
+    "ink-gradient": "^3.0.0",
+    "ink-select-input": "^6.2.0",
+    "ink-text-input": "^6.0.0"
+  },
+  "scripts": {
+    "dev": "bun run src/cli.tsx",
+    "build": "bun build src/cli.tsx --outdir dist --target bun",
+    "start": "bun run dist/cli.js",
+    "type-check": "tsc --noEmit"
   }
 }

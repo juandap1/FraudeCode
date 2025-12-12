@@ -6,5 +6,18 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+  chromadb:
+    image: ghcr.io/chroma-core/chroma:latest
+    environment:
+      # This environment variable ensures persistence is enabled
+      - IS_PERSISTENT=TRUE
+    volumes:
+      # Mounts a local volume to the directory where Chroma stores its data
+      - chroma-data:/chroma/chroma/
+    ports:
+      # Maps port 8000 on your host to port 8000 in the container (Chroma's default port)
+      - "8000:8000"
 volumes:
   ollama_data:
+  chroma-data:
+    driver: local
