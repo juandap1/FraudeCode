@@ -24,7 +24,14 @@ const Session = ({ onDone }: { onDone: () => void }) => {
 };
 
 export default function App() {
+  const [started, setStarted] = useState(false);
   const [sessions, setSessions] = useState([0]);
+
+  useInput((input, key) => {
+    if (key.return) {
+      setStarted(true);
+    }
+  });
 
   const handleDone = (index: number) => {
     if (index === sessions.length - 1) {
@@ -34,10 +41,11 @@ export default function App() {
 
   return (
     <Box flexDirection="column">
-      <IntroComponent />
-      {sessions.map((key, index) => (
-        <Session key={key} onDone={() => handleDone(index)} />
-      ))}
+      {!started && <IntroComponent />}
+      {started &&
+        sessions.map((key, index) => (
+          <Session key={key} onDone={() => handleDone(index)} />
+        ))}
     </Box>
   );
 }

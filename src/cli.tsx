@@ -1,4 +1,4 @@
 import { render, Box, Text } from "ink";
 import App from "./app";
-process.stdout.write("\x1Bc");
+console.clear();
 render(<App />);

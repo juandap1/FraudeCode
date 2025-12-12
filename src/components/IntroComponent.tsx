@@ -1,4 +1,4 @@
-import { render, Box, Text } from "ink";
+import { Box, Text } from "ink";
 
 import Gradient from "ink-gradient";
 import BigText from "ink-big-text";
@@ -36,6 +36,9 @@ export default function IntroComponent() {
         <BigText text="Fraude" />
         <BigText text="Code" />
       </Gradient>
+      <Text dimColor>
+        Press <Text bold>Enter</Text> to continue...
+      </Text>
     </Box>
   );
 }
