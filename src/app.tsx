@@ -3,12 +3,19 @@ import { Box } from "ink";
 import useOllamaClient from "./utils/ollamacli";
 import OllamaClientComponent from "./components/OllamaClientComponent";
 import { useState, useEffect } from "react";
+import { useInput } from "ink";
 
 const Session = ({ onDone }: { onDone: () => void }) => {
   const OllamaClient = useOllamaClient("tinyllama:latest");
 
+  useInput((input, key) => {
+    if (key.escape || input === "\u001b") {
+      OllamaClient.interrupt();
+    }
+  });
+
   useEffect(() => {
-    if (OllamaClient.status === 2) {
+    if (OllamaClient.status === 2 || OllamaClient.status === -1) {
       onDone();
     }
   }, [OllamaClient.status, onDone]);

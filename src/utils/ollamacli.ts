@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 
 const OLLAMA_URL = "http://localhost:11434/api/chat";
 
@@ -10,9 +10,10 @@ export type TokenUsage = {
 
 export interface OllamaCLI {
   streamedText: string;
-  status: number; // 0 = idle, 1 = loading, 2 = done
+  status: number; // 0 = idle, 1 = loading, 2 = done, -1 = interrupted
   tokenUsage: TokenUsage;
   completionQuery: (query: string) => Promise<void>;
+  interrupt: () => void;
 }
 
 export function useOllamaClient(model: string): OllamaCLI {
@@ -24,8 +25,16 @@ export function useOllamaClient(model: string): OllamaCLI {
     completion: 0,
   });
 
+  const abortRef = useRef<AbortController | null>(null);
+
   const completionQuery = useCallback(
     async (query: string) => {
+      // Abort any ongoing request before starting a new one
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+      abortRef.current = new AbortController();
+
       setStatus(1);
       setStreamedText(""); // Reset text for new query
 
@@ -41,6 +50,7 @@ export function useOllamaClient(model: string): OllamaCLI {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
+          signal: abortRef.current.signal,
         });
 
         if (!response.ok || !response.body) {
@@ -51,6 +61,10 @@ export function useOllamaClient(model: string): OllamaCLI {
         const decoder = new TextDecoder("utf-8");
 
         while (true) {
+          if (abortRef.current?.signal.aborted) {
+            reader.cancel();
+            return;
+          }
           const { done, value } = await reader.read();
           if (done) break;
 
@@ -83,7 +97,10 @@ export function useOllamaClient(model: string): OllamaCLI {
           }
         }
         setStatus(2);
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === "AbortError") {
+          return;
+        }
         console.error("Failed to stream response:", error);
         setStatus(2);
       }
@@ -91,11 +108,19 @@ export function useOllamaClient(model: string): OllamaCLI {
     [model]
   );
 
+  const interrupt = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    setStatus(-1);
+  }, []);
+
   return {
     streamedText,
     status,
     completionQuery,
     tokenUsage,
+    interrupt,
   };
 }
 

@@ -22,7 +22,7 @@ const LoaderComponent = ({
           setElapsed((prev) => prev + 1);
         }, 100)
       );
-    } else if (status === 2) {
+    } else {
       if (interval != null) clearInterval(interval);
       editInterval(null);
     }
@@ -42,6 +42,9 @@ const LoaderComponent = ({
         <Text dimColor>
           Finished ({(elapsed / 10).toFixed(1)}s ※ {tokenUsage.total} tokens)
         </Text>
+      )}
+      {status === -1 && (
+        <Text dimColor>Interrupted ({(elapsed / 10).toFixed(1)}s)</Text>
       )}
     </Box>
   );
