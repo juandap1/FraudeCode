@@ -4,6 +4,7 @@ import useOllamaClient from "./utils/ollamacli";
 import OllamaClientComponent from "./components/OllamaClientComponent";
 import { useState, useEffect } from "react";
 import { useInput } from "ink";
+import log from "./utils/logger";
 
 const Session = ({ onDone }: { onDone: () => void }) => {
   const OllamaClient = useOllamaClient("tinyllama:latest");
@@ -26,6 +27,7 @@ const Session = ({ onDone }: { onDone: () => void }) => {
 export default function App() {
   const [started, setStarted] = useState(false);
   const [sessions, setSessions] = useState([0]);
+  log("App started");
 
   useInput((input, key) => {
     if (key.return) {

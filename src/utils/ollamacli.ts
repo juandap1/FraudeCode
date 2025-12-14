@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 
-const OLLAMA_URL = "http://localhost:11434/api/chat";
+const OLLAMA_URL = "http://localhost:11434";
 
 export type TokenUsage = {
   total: number;
@@ -14,6 +14,7 @@ export interface OllamaCLI {
   tokenUsage: TokenUsage;
   completionQuery: (query: string) => Promise<void>;
   interrupt: () => void;
+  embedString: (query: string) => Promise<number[]>;
 }
 
 export function useOllamaClient(model: string): OllamaCLI {
@@ -46,7 +47,7 @@ export function useOllamaClient(model: string): OllamaCLI {
       };
 
       try {
-        const response = await fetch(OLLAMA_URL, {
+        const response = await fetch(`${OLLAMA_URL}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -115,12 +116,34 @@ export function useOllamaClient(model: string): OllamaCLI {
     setStatus(-1);
   }, []);
 
+  const embedString = useCallback(async (query: string) => {
+    const res = await fetch(`${OLLAMA_URL}/api/embeddings`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "snowflake-arctic-embed:latest",
+        prompt: query,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Ollama error: ${res.status} ${await res.text()}`);
+    }
+
+    const data: any = await res.json();
+    console.log(data);
+    return data.embedding;
+  }, []);
+
   return {
     streamedText,
     status,
     completionQuery,
     tokenUsage,
     interrupt,
+    embedString,
   };
 }
 
