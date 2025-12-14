@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "chromadb": "^3.1.7",
+    "ignore": "^7.0.5",
     "ink-big-text": "^2.0.0",
     "ink-gradient": "^3.0.0",
     "ink-select-input": "^6.2.0",
