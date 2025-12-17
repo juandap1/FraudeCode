@@ -144,6 +144,11 @@ async function analyzeCode(filePath: string) {
       chunks.push(...gapSplits);
     }
 
+    const parentNode = findWantedParent(node, pyConfig.wantedNodes);
+    const parentSymbol = parentNode
+      ? parentNode.childForFieldName("name")?.text
+      : undefined;
+
     const nodeContent = code.slice(node.startIndex, node.endIndex);
     const nodeLine = node.startPosition.row;
     const nodeSplits = await split(nodeContent, nodeLine);
@@ -152,6 +157,7 @@ async function analyzeCode(filePath: string) {
         return {
           ...n,
           symbol: node.childForFieldName("name")?.text,
+          parent: parentSymbol,
         };
       })
     );
@@ -192,6 +198,17 @@ function collectTreeNodes(node: Node, wantedNodes: Set<string>): Node[] {
   return treeNodes;
 }
 
+function findWantedParent(node: Node, wantedConfigs: Set<string>): Node | null {
+  let curr = node.parent;
+  while (curr) {
+    if (wantedConfigs.has(curr.type)) {
+      return curr;
+    }
+    curr = curr.parent;
+  }
+  return null;
+}
+
 const MAX_TOKENS = 8192;
 
 type Chunk = {
@@ -199,6 +216,8 @@ type Chunk = {
   document: string;
   startLine: number;
   endLine: number;
+  parent?: string;
+  symbol?: string;
 };
 
 async function split(src: string, startLine: number): Promise<Chunk[]> {
