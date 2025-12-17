@@ -65,14 +65,19 @@ async function addBatch(
 ) {
   console.log("Adding batch");
   const batch = chunks.slice(0, batchSize);
-  console.log(batch.length);
-  console.log(batch[0]);
+  // console.log(batch.length);
+  // console.log(batch[0]);
   const points = await Promise.all(
     batch.map(async (chunk) => {
       const { id, document, ...metadata } = chunk;
+      const denseVector = await embed(document);
+      const sparseVector = qdrantCli.getSparseVector(document);
       return {
         id,
-        vector: await embed(document),
+        vector: {
+          "arctic-dense": denseVector,
+          "code-sparse": sparseVector,
+        },
         payload: { ...metadata, rawDocument: document },
       };
     })

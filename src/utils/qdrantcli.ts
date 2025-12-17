@@ -15,6 +15,35 @@ class QdrantCli {
     });
   }
 
+  getSparseVector(text: string) {
+    const tokens = text
+      .toLowerCase()
+      .split(/\W+/)
+      .filter((t) => t.length > 2);
+    const counts: Record<string, number> = {};
+
+    tokens.forEach((t) => (counts[t] = (counts[t] || 0) + 1));
+
+    // Map tokens to numerical indices (ideally using a consistent hashing function)
+    const indices = [];
+    const values = [];
+
+    for (const [token, count] of Object.entries(counts)) {
+      // Simple hash function for demonstration
+      const index =
+        Math.abs(
+          token.split("").reduce((a, b) => {
+            a = (a << 5) - a + b.charCodeAt(0);
+            return a & a;
+          }, 0)
+        ) % 1000000;
+
+      indices.push(index);
+      values.push(count);
+    }
+    return { indices, values };
+  }
+
   async getOrCreateCollection(name: string) {
     try {
       // Try to fetch first (cheap + fast)
@@ -25,8 +54,15 @@ class QdrantCli {
       if (err?.status === 404) {
         await this.client.createCollection(name, {
           vectors: {
-            size: 1024,
-            distance: "Cosine",
+            "arctic-dense": {
+              size: 1024, // Change to 768 if using the 'm' version
+              distance: "Cosine",
+            },
+          },
+          sparse_vectors: {
+            "code-sparse": {
+              index: { on_disk: true },
+            },
           },
         });
         return { created: true };
@@ -37,8 +73,8 @@ class QdrantCli {
   }
 
   async upsertCollections(collectionName: string, points: any[]) {
-    console.log("Upserting");
-    console.log(points);
+    // console.log("Upserting");
+    // console.log(points);
     await this.client.upsert(collectionName, {
       wait: true, // optional: wait for operation to complete
       points: points,
