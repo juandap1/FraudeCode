@@ -5,10 +5,6 @@ import path from "path";
 import ignore from "ignore";
 
 const GRAMMAR_PATH = "./parsers/tree-sitter-python.wasm";
-const CODE_FILE = "./sample/sample.py";
-
-const OLLAMA_URL = "http://localhost:11434/api/embeddings";
-const MODEL = "snowflake-arctic-embed:latest";
 
 interface GitRepo {
   path: string;
@@ -70,7 +66,7 @@ async function addBatch(
   const points = await Promise.all(
     batch.map(async (chunk) => {
       const { id, document, ...metadata } = chunk;
-      const denseVector = await embed(document);
+      const denseVector = await qdrantCli.embed(document);
       const sparseVector = qdrantCli.getSparseVector(document);
       return {
         id,
@@ -84,26 +80,6 @@ async function addBatch(
   );
   await qdrantCli.upsertCollections(collectionName, points);
   return chunks.slice(batchSize);
-}
-
-async function embed(text: string): Promise<number[]> {
-  const res = await fetch(OLLAMA_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      prompt: text,
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Ollama error: ${res.status} ${await res.text()}`);
-  }
-
-  const data: any = await res.json();
-  return data.embedding;
 }
 
 const pyConfig = {
@@ -278,10 +254,8 @@ async function split(src: string, startLine: number): Promise<Chunk[]> {
   };
   let client = new QdrantCli();
   await client.getOrCreateCollection(repo.name);
-  await indexAllFiles(repo, client);
-  //   const res = await client.searchCollections(
-  //     repo.name,
-  //     await embed("calculate")
-  //   );
-  //   console.log(res.points);
+  // await indexAllFiles(repo, client);
+  const query = "Where is the token verification logic?";
+  const results = await client.hybridSearch(repo.name, query);
+  console.log(results);
 })();

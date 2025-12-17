@@ -6,6 +6,9 @@ import { QdrantClient } from "@qdrant/js-client-rest";
 // nomic-embed-text: A strong model, particularly for long-context tasks, with a large token context window.
 // embeddinggemma: A lightweight and efficient model from Google, suitable for resource-constrained environments.
 
+const OLLAMA_URL = "http://localhost:11434/api/embeddings";
+const MODEL = "snowflake-arctic-embed:latest";
+
 class QdrantCli {
   client: QdrantClient;
 
@@ -87,6 +90,45 @@ class QdrantCli {
       limit: 3,
       with_payload: true,
     });
+  }
+
+  async embed(text: string): Promise<number[]> {
+    const res = await fetch(OLLAMA_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        prompt: text,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Ollama error: ${res.status} ${await res.text()}`);
+    }
+
+    const data: any = await res.json();
+    return data.embedding;
+  }
+
+  async hybridSearch(collectionName: string, query: any) {
+    // IMPORTANT: Apply the prefix to the search query ONLY
+    const queryWithPrefix = `Represent this sentence for searching relevant passages: ${query}`;
+
+    const denseQuery = await this.embed(queryWithPrefix);
+    const sparseQuery = this.getSparseVector(query);
+
+    const results = await this.client.query(collectionName, {
+      prefetch: [
+        { query: denseQuery, using: "arctic-dense", limit: 20 },
+        { query: sparseQuery, using: "code-sparse", limit: 20 },
+      ],
+      query: { fusion: "rrf" }, // Rank Reciprocal Fusion
+      limit: 5,
+      with_payload: true,
+    });
+    return results;
   }
 }
 
