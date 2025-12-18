@@ -11,6 +11,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
     "@qdrant/js-client-rest": "^1.16.2",
     "ignore": "^7.0.5",
     "ink-big-text": "^2.0.0",

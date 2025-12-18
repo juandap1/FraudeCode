@@ -1,4 +1,5 @@
 import { QdrantClient } from "@qdrant/js-client-rest";
+import { pipeline } from "@huggingface/transformers";
 
 // Embedding Models
 // bge-m3: Known for multi-functionality, multi-linguality (100+ languages), and multi-granularity (up to 8192 tokens).
@@ -11,11 +12,23 @@ const MODEL = "snowflake-arctic-embed:latest";
 
 class QdrantCli {
   client: QdrantClient;
+  reranker: any;
 
   constructor() {
     this.client = new QdrantClient({
       url: "http://localhost:6333",
     });
+  }
+
+  async init() {
+    this.reranker = await pipeline(
+      "text-classification",
+      "Xenova/bge-reranker-base",
+      {
+        revision: "main",
+        dtype: "q8", // Keeps memory usage low
+      }
+    );
   }
 
   getSparseVector(text: string) {
@@ -119,16 +132,46 @@ class QdrantCli {
     const denseQuery = await this.embed(queryWithPrefix);
     const sparseQuery = this.getSparseVector(query);
 
-    const results = await this.client.query(collectionName, {
+    const initialResults = await this.client.query(collectionName, {
       prefetch: [
         { query: denseQuery, using: "arctic-dense", limit: 20 },
         { query: sparseQuery, using: "code-sparse", limit: 20 },
       ],
       query: { fusion: "rrf" }, // Rank Reciprocal Fusion
-      limit: 5,
+      limit: 50,
       with_payload: true,
     });
-    return results;
+
+    const finalContext = await this.rerankResults(
+      query,
+      initialResults.points,
+      5
+    );
+    return finalContext;
+  }
+
+  async rerankResults(query: string, chunks: any[], topK: number = 5) {
+    // 1. Prepare pairs for the model
+    // The model expects an array of pairs: [query, document]
+    const results = await Promise.all(
+      chunks.map(async (chunk) => {
+        // Note: Transformers.js handles concatenation internally
+        const output = await this.reranker(query, {
+          text_pair: chunk.payload.code,
+          topk: 1, // We just want the 'RELEVANT' score
+        });
+
+        return {
+          ...chunk,
+          rerank_score: output[0].score,
+        };
+      })
+    );
+
+    // 2. Sort by the new reranker score (descending)
+    return results
+      .sort((a, b) => b.rerank_score - a.rerank_score)
+      .slice(0, topK);
   }
 }
 

@@ -253,9 +253,10 @@ async function split(src: string, startLine: number): Promise<Chunk[]> {
     name: "sample",
   };
   let client = new QdrantCli();
+  await client.init();
   await client.getOrCreateCollection(repo.name);
   // await indexAllFiles(repo, client);
-  const query = "Where is the token verification logic?";
+  const query = "How can I multiply two numbers?";
   const results = await client.hybridSearch(repo.name, query);
   console.log(results);
 })();
