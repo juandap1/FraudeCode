@@ -67,27 +67,6 @@ export function useOllamaClient(model: string): OllamaCLI {
     [model]
   );
 
-  const completionQuery = useCallback(
-    async (query: string) => {
-      // Abort any ongoing request before starting a new one
-      if (abortRef.current) {
-        abortRef.current.abort();
-      }
-      abortRef.current = new AbortController();
-
-      setStatus(1);
-      setStreamedText(""); // Reset text for new query
-
-      const payload = {
-        model,
-        stream: true,
-        messages: [{ role: "user", content: query }],
-        options: { temperature: 0.6 },
-      };
-    },
-    [model]
-  );
-
   const ollamaQuery = useCallback(
     async (payload: any, abortRef: any) => {
       try {
