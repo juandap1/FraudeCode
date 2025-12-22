@@ -7,7 +7,8 @@ import { useInput } from "ink";
 import log from "./utils/logger";
 
 const Session = ({ onDone }: { onDone: () => void }) => {
-  const OllamaClient = useOllamaClient("tinyllama:latest");
+  // const OllamaClient = useOllamaClient("tinyllama:latest");
+  const OllamaClient = useOllamaClient("llama3.1:latest");
 
   useInput((input, key) => {
     if (key.escape || input === "\u001b") {

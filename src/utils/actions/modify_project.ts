@@ -4,45 +4,11 @@ import * as fs from "fs";
 import * as path from "path";
 import * as diff from "diff";
 
-const OLLAMA_URL = "http://localhost:11434";
-const MODEL = "llama3.1:latest"; // Or qwen2.5-coder:7b if available
-
-async function queryOllama(prompt: string) {
-  const payload = {
-    model: MODEL,
-    messages: [{ role: "user", content: prompt }],
-    stream: false,
-  };
-
-  const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Ollama error: ${res.status} ${await res.text()}`);
-  }
-
-  const data: any = await res.json();
-  return data.message.content;
-}
-
-async function main() {
-  const query = process.argv[2];
-  if (!query) {
-    console.error(
-      'Please provide a query: bun run modify_project.ts "Your request"'
-    );
-    process.exit(1);
-  }
-
-  console.log(`Processing query: "${query}"`);
-
-  const neo4j = new Neo4jClient();
-  const qdrant = new QdrantCli();
-  await qdrant.init();
-
+export default async function modifyProject(
+  query: string,
+  neo4j: Neo4jClient,
+  qdrant: QdrantCli
+) {
   const repoName = "sample";
   const repoPath = "/Users/mbranni03/Documents/GitHub/FraudeCode/sample";
 

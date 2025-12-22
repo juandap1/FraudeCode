@@ -38,28 +38,23 @@ export function useOllamaClient(model: string): OllamaCLI {
     prompt: 0,
     completion: 0,
   });
-
   const abortRef = useRef<AbortController | null>(null);
 
-  const handleQuery = useCallback(
-    async (query: string) => {
+  useEffect(() => {
+    return () => {
       if (abortRef.current) {
         abortRef.current.abort();
       }
-      abortRef.current = new AbortController();
+    };
+  }, []);
 
+  const handleQuery = useCallback(
+    async (query: string) => {
       setStatus(1);
       setStreamedText("");
 
       if (query.trim() == "/summarize") {
-        const prompt = await summarizeProject(neo4j, qdrant);
-        const payload = {
-          model,
-          stream: true,
-          messages: [{ role: "user", content: prompt }],
-          options: { temperature: 0.6 },
-        };
-        await ollamaQuery(payload, abortRef);
+        const prompt = await summarizeProject(neo4j, qdrant, ollamaQuery);
       } else {
         notFoundError();
       }
@@ -68,8 +63,18 @@ export function useOllamaClient(model: string): OllamaCLI {
   );
 
   const ollamaQuery = useCallback(
-    async (payload: any, abortRef: any) => {
+    async (payload: any) => {
       try {
+        if (abortRef.current) {
+          abortRef.current.abort();
+        }
+        abortRef.current = new AbortController();
+
+        let modifiedPayload = payload;
+        modifiedPayload.stream = true;
+        if (!payload.model) {
+          modifiedPayload.model = model;
+        }
         const response = await fetch(`${OLLAMA_URL}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -140,11 +145,17 @@ export function useOllamaClient(model: string): OllamaCLI {
   const interrupt = useCallback(() => {
     if (abortRef.current) {
       abortRef.current.abort();
+      abortRef.current = null;
     }
     setStatus(-1);
   }, []);
 
   const embedString = useCallback(async (query: string) => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    abortRef.current = new AbortController();
+
     const res = await fetch(`${OLLAMA_URL}/api/embeddings`, {
       method: "POST",
       headers: {
@@ -154,6 +165,7 @@ export function useOllamaClient(model: string): OllamaCLI {
         model: "snowflake-arctic-embed:latest",
         prompt: query,
       }),
+      signal: abortRef.current.signal,
     });
 
     if (!res.ok) {

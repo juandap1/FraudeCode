@@ -3,7 +3,8 @@ import type QdrantCli from "../qdrantcli";
 
 export default async function summarizeProject(
   neo4j: Neo4jClient,
-  qdrant: QdrantCli
+  qdrant: QdrantCli,
+  action: (payload: any) => void
 ) {
   console.log("Starting Project Summary extraction...");
 
@@ -56,7 +57,7 @@ export default async function summarizeProject(
   }
 
   // 3. Synthesize with Ollama
-  console.log("Synthesizing summary with Ollama (qwen2.5-coder:7b)...");
+  console.log("Synthesizing summary with Ollama (llama3.1:latest)...");
   const prompt = `
 You are a senior software architect. Analyze the follow project structure and code snippets from the "${repoName}" project.
 Then provide:
@@ -73,7 +74,12 @@ ${codeContext}
 Full Response:
 `;
 
-  return prompt;
+  const payload = {
+    messages: [{ role: "user", content: prompt }],
+    options: { temperature: 0.6 },
+  };
+
+  await action(payload);
 
   // try {
   //   const summary = await queryOllama("llama3.1:latest", prompt);
