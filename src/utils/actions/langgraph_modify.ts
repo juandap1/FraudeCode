@@ -46,6 +46,10 @@ const AgentState = Annotation.Root({
   thinkingProcess: Annotation<string>(),
   modifications: Annotation<string>(),
   diffs: Annotation<string>(),
+  llmContext: Annotation<{
+    thinkerPromptSize: number;
+    coderPromptSize: number;
+  }>(),
   error: Annotation<string | undefined>(),
   status: Annotation<string>(),
 });
@@ -182,14 +186,18 @@ export default async function langgraphModify(
     setStreamedText((prev) => prev + "\n📦 [STEP 4/4] Combining context...\n");
 
     // Context is already combined in state, just validate
-    const hasCode = (state.codeContext?.length || 0) > 0;
-    const hasStructure = (state.structuralContext?.length || 0) > 0;
+    const codeContextSize = state.codeContext?.length || 0;
+    const structuralContextSize = state.structuralContext?.length || 0;
 
     setStreamedText(
       (prev) =>
         prev +
-        `   Code context: ${hasCode ? "✓" : "✗"}\n` +
-        `   Structural context: ${hasStructure ? "✓" : "✗"}\n` +
+        `   Code context: ${
+          codeContextSize > 0 ? "✓" : "✗"
+        } (${codeContextSize} chars)\n` +
+        `   Structural context: ${
+          structuralContextSize > 0 ? "✓" : "✗"
+        } (${structuralContextSize} chars)\n` +
         "\n✅ Context gathering complete.\n"
     );
 
@@ -220,6 +228,11 @@ Instructions:
 Output your plan as a detailed technical specification. Begin immediately.
 `;
 
+    const promptSize = prompt.length;
+    setStreamedText(
+      (prev) => prev + `   Thinker prompt size: ${promptSize} characters\n\n`
+    );
+
     let thinkingProcess = "";
     const stream = await thinkerModel.stream([new HumanMessage(prompt)]);
     for await (const chunk of stream) {
@@ -232,6 +245,10 @@ Output your plan as a detailed technical specification. Begin immediately.
 
     return {
       thinkingProcess,
+      llmContext: {
+        ...state.llmContext,
+        thinkerPromptSize: promptSize,
+      },
       status: "planning_complete",
     };
   };
@@ -265,6 +282,11 @@ FILE: sample/utils.py
 \`\`\`
 `;
 
+    const promptSize = prompt.length;
+    setStreamedText(
+      (prev) => prev + `   Coder prompt size: ${promptSize} characters\n\n`
+    );
+
     let modifications = "";
     const stream = await coderModel.stream([new HumanMessage(prompt)]);
     for await (const chunk of stream) {
@@ -277,6 +299,10 @@ FILE: sample/utils.py
 
     return {
       modifications,
+      llmContext: {
+        ...state.llmContext,
+        coderPromptSize: promptSize,
+      },
       status: "code_generated",
     };
   };
@@ -384,6 +410,7 @@ FILE: sample/utils.py
     repoName,
     repoPath,
     status: "started",
+    llmContext: { thinkerPromptSize: 0, coderPromptSize: 0 },
   });
 
   return finalState.diffs;
