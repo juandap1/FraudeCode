@@ -7,11 +7,40 @@ import * as fs from "fs";
 import * as path from "path";
 import * as diff from "diff";
 
+// ANSI color codes for diff styling
+const COLORS = {
+  green: "\x1b[32m",
+  red: "\x1b[31m",
+  dim: "\x1b[2m",
+  reset: "\x1b[0m",
+  bold: "\x1b[1m",
+};
+
+// Helper function to format diff lines with colors
+function formatDiffLine(
+  type: "added" | "removed" | "context",
+  lineNum: string,
+  content: string
+): string {
+  switch (type) {
+    case "added":
+      return `${COLORS.green}      [${lineNum}] + ${content}${COLORS.reset}\n`;
+    case "removed":
+      return `${COLORS.red}[${lineNum}]       - ${content}${COLORS.reset}\n`;
+    case "context":
+      return `${COLORS.dim}${lineNum}   ${content}${COLORS.reset}\n`;
+  }
+}
+
 // Define the state of our graph
 const AgentState = Annotation.Root({
   query: Annotation<string>(),
   repoPath: Annotation<string>(),
   repoName: Annotation<string>(),
+  // Intermediate context gathering state
+  qdrantResults: Annotation<any[]>(),
+  filePaths: Annotation<string[]>(),
+  // Final context state
   structuralContext: Annotation<string>(),
   codeContext: Annotation<string>(),
   thinkingProcess: Annotation<string>(),
@@ -44,27 +73,52 @@ export default async function langgraphModify(
 
   // --- Nodes ---
 
-  const analyzeNode = async (state: typeof AgentState.State) => {
-    setStreamedText(() => "🔍 [ANALYSIS] Starting contextual search...\n");
-
-    // 1. Semantic Search in Qdrant
+  // Step 1: Search Qdrant for semantic context
+  const searchQdrantNode = async (state: typeof AgentState.State) => {
     setStreamedText(
-      (prev) => prev + "📡 Searching Qdrant vector database...\n"
+      () => "🔍 [STEP 1/4] Searching Qdrant vector database...\n"
     );
+
     const searchResults = await qdrant.hybridSearch(
       state.repoName,
       state.query
     );
 
-    // 2. Structural Context from Neo4j
+    // Extract file paths from results
+    const filePaths: string[] = [];
+    if (searchResults) {
+      for (const res of searchResults as any[]) {
+        const filePath = res.payload.filePath;
+        if (filePath && !filePaths.includes(filePath)) {
+          filePaths.push(filePath);
+        }
+      }
+    }
+
+    setStreamedText(
+      (prev) => prev + `   Found ${filePaths.length} relevant files.\n`
+    );
+
+    return {
+      qdrantResults: searchResults || [],
+      filePaths,
+      status: "qdrant_search_complete",
+    };
+  };
+
+  // Step 2: Search Neo4j for structural context
+  const searchNeo4jNode = async (state: typeof AgentState.State) => {
+    setStreamedText(
+      (prev) =>
+        prev + "\n🧬 [STEP 2/4] Searching Neo4j for structural context...\n"
+    );
+
     const words = state.query.split(/\W+/);
     let structuralContext = "";
+
     for (const word of words) {
       if (word.length < 3) continue;
-      setStreamedText(
-        (prev) =>
-          prev + `🧬 Inspecting structural relationships for "${word}"...\n`
-      );
+      setStreamedText((prev) => prev + `   Inspecting symbol: "${word}"...\n`);
       const symContext = await neo4j.getContextBySymbol(word);
       if (symContext.length > 0) {
         structuralContext +=
@@ -74,18 +128,36 @@ export default async function langgraphModify(
       }
     }
 
-    // 3. Gather File Contents
+    const foundSymbols = structuralContext.length > 0;
+    setStreamedText(
+      (prev) =>
+        prev +
+        `   ${
+          foundSymbols
+            ? "Structural context found."
+            : "No structural context found."
+        }\n`
+    );
+
+    return {
+      structuralContext,
+      status: "neo4j_search_complete",
+    };
+  };
+
+  // Step 3: Read file contents from discovered paths
+  const gatherFilesNode = async (state: typeof AgentState.State) => {
+    setStreamedText(
+      (prev) => prev + "\n📄 [STEP 3/4] Reading file contents...\n"
+    );
+
     const fileContents: Record<string, string> = {};
-    if (searchResults) {
-      for (const res of searchResults as any[]) {
-        const filePath = res.payload.filePath;
-        if (filePath && !fileContents[filePath]) {
-          const absPath = path.join(state.repoPath, "..", filePath);
-          if (fs.existsSync(absPath)) {
-            setStreamedText((prev) => prev + `📄 Reading file: ${filePath}\n`);
-            fileContents[filePath] = fs.readFileSync(absPath, "utf8");
-          }
-        }
+
+    for (const filePath of state.filePaths || []) {
+      const absPath = path.join(state.repoPath, "..", filePath);
+      if (fs.existsSync(absPath)) {
+        setStreamedText((prev) => prev + `   Reading: ${filePath}\n`);
+        fileContents[filePath] = fs.readFileSync(absPath, "utf8");
       }
     }
 
@@ -94,11 +166,34 @@ export default async function langgraphModify(
       codeContext += `--- FILE: ${filePath} ---\n${content}\n\n`;
     }
 
-    setStreamedText((prev) => prev + "\n✅ Context gathering complete.\n");
+    setStreamedText(
+      (prev) =>
+        prev + `   Loaded ${Object.keys(fileContents).length} file(s).\n`
+    );
 
     return {
-      structuralContext,
       codeContext,
+      status: "files_gathered",
+    };
+  };
+
+  // Step 4: Combine and finalize context
+  const combineContextNode = async (state: typeof AgentState.State) => {
+    setStreamedText((prev) => prev + "\n📦 [STEP 4/4] Combining context...\n");
+
+    // Context is already combined in state, just validate
+    const hasCode = (state.codeContext?.length || 0) > 0;
+    const hasStructure = (state.structuralContext?.length || 0) > 0;
+
+    setStreamedText(
+      (prev) =>
+        prev +
+        `   Code context: ${hasCode ? "✓" : "✗"}\n` +
+        `   Structural context: ${hasStructure ? "✓" : "✗"}\n` +
+        "\n✅ Context gathering complete.\n"
+    );
+
+    return {
       status: "context_gathered",
     };
   };
@@ -220,19 +315,24 @@ FILE: sample/utils.py
 
           partLines.forEach((line: string) => {
             if (part.added) {
-              fileDiff += `      [${newLine
-                .toString()
-                .padStart(3)}] + ${line}\n`;
+              fileDiff += formatDiffLine(
+                "added",
+                newLine.toString().padStart(3),
+                line
+              );
               newLine++;
             } else if (part.removed) {
-              fileDiff += `[${oldLine
-                .toString()
-                .padStart(3)}]       - ${line}\n`;
+              fileDiff += formatDiffLine(
+                "removed",
+                oldLine.toString().padStart(3),
+                line
+              );
               oldLine++;
             } else {
-              fileDiff += `[${oldLine.toString().padStart(3)}][${newLine
+              const contextLineNum = `[${oldLine
                 .toString()
-                .padStart(3)}]   ${line}\n`;
+                .padStart(3)}][${newLine.toString().padStart(3)}]`;
+              fileDiff += formatDiffLine("context", contextLineNum, line);
               oldLine++;
               newLine++;
             }
@@ -256,13 +356,23 @@ FILE: sample/utils.py
   // --- Graph Build ---
 
   const workflow = new StateGraph(AgentState)
-    .addNode("analyze", analyzeNode)
+    // Context gathering nodes (chunked)
+    .addNode("searchQdrant", searchQdrantNode)
+    .addNode("searchNeo4j", searchNeo4jNode)
+    .addNode("gatherFiles", gatherFilesNode)
+    .addNode("combineContext", combineContextNode)
+    // Core processing nodes
     .addNode("think", thinkNode)
     .addNode("code", codeNode)
     .addNode("verify", verifyNode);
 
-  workflow.addEdge(START, "analyze");
-  workflow.addEdge("analyze", "think");
+  // Connect chunked context gathering flow
+  workflow.addEdge(START, "searchQdrant");
+  workflow.addEdge("searchQdrant", "searchNeo4j");
+  workflow.addEdge("searchNeo4j", "gatherFiles");
+  workflow.addEdge("gatherFiles", "combineContext");
+  // Continue to planning and implementation
+  workflow.addEdge("combineContext", "think");
   workflow.addEdge("think", "code");
   workflow.addEdge("code", "verify");
   workflow.addEdge("verify", END);
