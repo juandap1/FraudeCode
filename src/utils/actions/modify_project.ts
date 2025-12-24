@@ -8,7 +8,7 @@ export default async function modifyProject(
   query: string,
   neo4j: Neo4jClient,
   qdrant: QdrantCli,
-  action: (payload: any) => Promise<string>,
+  action: (payload: any) => Promise<string | undefined>,
   setStreamedText: (text: string) => void
 ) {
   const repoName = "sample";
@@ -37,7 +37,7 @@ export default async function modifyProject(
   // 3. Gather File Contents
   const fileContents: Record<string, string> = {};
   if (searchResults) {
-    for (const res of searchResults) {
+    for (const res of searchResults as any[]) {
       const filePath = res.payload.filePath;
       if (filePath && !fileContents[filePath]) {
         const absPath = path.join(repoPath, "..", filePath);
@@ -90,6 +90,11 @@ Only output the file sections as specified above. Do not include any other text.
     stream: false,
   });
 
+  if (!modificationResponse) {
+    setStreamedText("Error: No response from Ollama.");
+    return;
+  }
+
   setStreamedText("Applying changes...");
   // 5. Apply Changes
   const fileBlocks = modificationResponse
@@ -104,7 +109,7 @@ Only output the file sections as specified above. Do not include any other text.
     const codeMatch = block.match(/```(?:\w+)?\n([\s\S]*?)```/);
 
     if (filePath && codeMatch) {
-      const newContent = codeMatch[1];
+      const newContent = codeMatch[1] ?? "";
       const absPath = path.join(repoPath, "..", filePath);
 
       let oldContent = "";
@@ -117,11 +122,11 @@ Only output the file sections as specified above. Do not include any other text.
       let newLine = 1;
       let fileDiff = `\n--- DIFF FOR ${filePath} ---\n`;
 
-      changes.forEach((part) => {
+      changes.forEach((part: diff.Change) => {
         const partLines = part.value.split("\n");
         if (partLines[partLines.length - 1] === "") partLines.pop();
 
-        partLines.forEach((line) => {
+        partLines.forEach((line: string) => {
           if (part.added) {
             fileDiff += `      [${newLine.toString().padStart(3)}] + ${line}\n`;
             newLine++;
@@ -154,5 +159,5 @@ Only output the file sections as specified above. Do not include any other text.
   console.log(allDiffs);
 
   console.log("Finished applying modifications.");
-  await neo4j.driver.close();
+  // await neo4j.driver.close();
 }
