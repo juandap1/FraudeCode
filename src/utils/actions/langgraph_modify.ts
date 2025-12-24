@@ -32,6 +32,15 @@ function formatDiffLine(
   }
 }
 
+// Define pending changes structure
+export interface PendingChange {
+  filePath: string;
+  absPath: string;
+  oldContent: string;
+  newContent: string;
+  diff: string;
+}
+
 // Define the state of our graph
 const AgentState = Annotation.Root({
   query: Annotation<string>(),
@@ -46,6 +55,8 @@ const AgentState = Annotation.Root({
   thinkingProcess: Annotation<string>(),
   modifications: Annotation<string>(),
   diffs: Annotation<string>(),
+  pendingChanges: Annotation<PendingChange[]>(),
+  userConfirmed: Annotation<boolean>(),
   llmContext: Annotation<{
     thinkerPromptSize: number;
     coderPromptSize: number;
@@ -58,7 +69,8 @@ export default async function langgraphModify(
   query: string,
   neo4j: Neo4jClient,
   qdrant: QdrantCli,
-  setStreamedText: (updater: (prev: string) => string) => void
+  setStreamedText: (updater: (prev: string) => string) => void,
+  promptUserConfirmation: () => Promise<boolean>
 ) {
   const repoName = "sample";
   const repoPath = "/Users/mbranni03/Documents/GitHub/FraudeCode/sample";
@@ -261,25 +273,55 @@ Output your plan as a detailed technical specification. Begin immediately.
     );
 
     const prompt = `
-You are an expert software engineer. Your task is to implement the modifications planned for the project.
+You are an expert software engineer. Your task is to implement ONLY the necessary modifications to the project.
 
 User Request: "${state.query}"
 Plan: ${state.thinkingProcess}
 File Contents: ${state.codeContext}
 
 Instructions:
-1. Provide the FULL content of each modified file.
-2. Format your response exactly as follows:
-   FILE: <path/to/file>
-   \`\`\`<language>
-   <full file content>
-   \`\`\`
+1. Provide ONLY the targeted changes needed - do NOT rewrite entire files.
+2. For each file, specify which lines to ADD and which to REMOVE.
+3. Format your response exactly as follows:
 
-Example:
-FILE: sample/utils.py
-\`\`\`python
-# updated content
+FILE: <path/to/file>
+AT LINE <line_number>:
+REMOVE:
+\`\`\`<language>
+<lines to remove - exact content>
 \`\`\`
+ADD:
+\`\`\`<language>
+<lines to add - replacement content>
+\`\`\`
+
+Example for adding a new import and modifying a function:
+
+FILE: sample/utils.py
+AT LINE 1:
+ADD:
+\`\`\`python
+import new_module
+\`\`\`
+
+AT LINE 15:
+REMOVE:
+\`\`\`python
+def old_function():
+    return "old"
+\`\`\`
+ADD:
+\`\`\`python
+def new_function():
+    return "new"
+\`\`\`
+
+IMPORTANT:
+- Only include lines that actually change
+- Keep the REMOVE and ADD blocks as small as possible
+- Include enough context in REMOVE to uniquely identify the location
+- If only adding (no removal), omit the REMOVE block
+- If only removing (no addition), omit the ADD block
 `;
 
     const promptSize = prompt.length;
@@ -307,76 +349,183 @@ FILE: sample/utils.py
     };
   };
 
-  const verifyNode = async (state: typeof AgentState.State) => {
-    setStreamedText((prev) => prev + "\n📉 [DIFF] Computing changes...\n");
-
-    const fileBlocks = state.modifications
+  // Helper to parse targeted modifications and apply them to files
+  const applyTargetedChanges = (
+    modifications: string,
+    repoPath: string
+  ): PendingChange[] => {
+    const pendingChanges: PendingChange[] = [];
+    const fileBlocks = modifications
       .split(/FILE: /)
       .filter((b) => b.trim().length > 0);
-
-    let allDiffs = "";
 
     for (const block of fileBlocks) {
       const lines = block.split("\n");
       const filePath = lines[0]?.trim();
-      const codeMatch = block.match(/```(?:\w+)?\n([\s\S]*?)```/);
 
-      if (filePath && codeMatch) {
-        const newContent = codeMatch[1] ?? "";
-        const absPath = path.join(state.repoPath, "..", filePath);
-
-        let oldContent = "";
-        if (fs.existsSync(absPath)) {
-          oldContent = fs.readFileSync(absPath, "utf8");
-        }
-
-        const changes = diff.diffLines(oldContent, newContent);
-        let oldLine = 1;
-        let newLine = 1;
-        let fileDiff = `\n--- DIFF FOR ${filePath} ---\n`;
-
-        changes.forEach((part: diff.Change) => {
-          const partLines = part.value.split("\n");
-          if (partLines[partLines.length - 1] === "") partLines.pop();
-
-          partLines.forEach((line: string) => {
-            if (part.added) {
-              fileDiff += formatDiffLine(
-                "added",
-                newLine.toString().padStart(3),
-                line
-              );
-              newLine++;
-            } else if (part.removed) {
-              fileDiff += formatDiffLine(
-                "removed",
-                oldLine.toString().padStart(3),
-                line
-              );
-              oldLine++;
-            } else {
-              const contextLineNum = `[${oldLine
-                .toString()
-                .padStart(3)}][${newLine.toString().padStart(3)}]`;
-              fileDiff += formatDiffLine("context", contextLineNum, line);
-              oldLine++;
-              newLine++;
-            }
-          });
-        });
-
-        allDiffs += fileDiff;
+      // Skip if filePath doesn't look like an actual file path
+      // (must contain a / or have a file extension like .py, .ts, etc.)
+      if (!filePath || (!filePath.includes("/") && !filePath.match(/\.\w+$/))) {
+        continue;
       }
+
+      const absPath = path.join(repoPath, "..", filePath);
+      let oldContent = "";
+      if (fs.existsSync(absPath)) {
+        oldContent = fs.readFileSync(absPath, "utf8");
+      }
+
+      let newContent = oldContent;
+
+      // Parse AT LINE sections
+      const atLineRegex =
+        /AT LINE (\d+):\s*(?:REMOVE:\s*```(?:\w+)?\n([\s\S]*?)```)?\s*(?:ADD:\s*```(?:\w+)?\n([\s\S]*?)```)?/g;
+      let match;
+      const changes: { line: number; remove?: string; add?: string }[] = [];
+
+      while ((match = atLineRegex.exec(block)) !== null) {
+        const lineNum = match[1];
+        if (lineNum) {
+          changes.push({
+            line: parseInt(lineNum, 10),
+            remove: match[2]?.trimEnd(),
+            add: match[3]?.trimEnd(),
+          });
+        }
+      }
+
+      // Apply changes in reverse order to preserve line numbers
+      changes.sort((a, b) => b.line - a.line);
+
+      const contentLines = newContent.split("\n");
+      for (const change of changes) {
+        if (change.remove) {
+          const removeLines = change.remove.split("\n");
+          // Find and remove the matching lines
+          const startIdx = change.line - 1;
+          let matchFound = true;
+          for (let i = 0; i < removeLines.length; i++) {
+            const contentLine = contentLines[startIdx + i];
+            const removeLine = removeLines[i];
+            if (contentLine?.trim() !== removeLine?.trim()) {
+              matchFound = false;
+              break;
+            }
+          }
+          if (matchFound) {
+            contentLines.splice(startIdx, removeLines.length);
+          }
+        }
+        if (change.add) {
+          const addLines = change.add.split("\n");
+          const insertIdx = change.line - 1;
+          contentLines.splice(insertIdx, 0, ...addLines);
+        }
+      }
+
+      newContent = contentLines.join("\n");
+
+      // Compute diff
+      const diffChanges = diff.diffLines(oldContent, newContent);
+      let oldLine = 1;
+      let newLine = 1;
+      let fileDiff = `\n--- DIFF FOR ${filePath} ---\n`;
+
+      diffChanges.forEach((part: diff.Change) => {
+        const partLines = part.value.split("\n");
+        if (partLines[partLines.length - 1] === "") partLines.pop();
+
+        partLines.forEach((line: string) => {
+          if (part.added) {
+            fileDiff += formatDiffLine(
+              "added",
+              newLine.toString().padStart(3),
+              line
+            );
+            newLine++;
+          } else if (part.removed) {
+            fileDiff += formatDiffLine(
+              "removed",
+              oldLine.toString().padStart(3),
+              line
+            );
+            oldLine++;
+          } else {
+            const contextLineNum = `[${oldLine
+              .toString()
+              .padStart(3)}][${newLine.toString().padStart(3)}]`;
+            fileDiff += formatDiffLine("context", contextLineNum, line);
+            oldLine++;
+            newLine++;
+          }
+        });
+      });
+
+      pendingChanges.push({
+        filePath,
+        absPath,
+        oldContent,
+        newContent,
+        diff: fileDiff,
+      });
     }
 
-    setStreamedText(
-      (prev) => prev + "\n✨ Final results ready.\n\n" + allDiffs
+    return pendingChanges;
+  };
+
+  const verifyNode = async (state: typeof AgentState.State) => {
+    setStreamedText((prev) => prev + "\n📉 [DIFF] Computing changes...\n");
+
+    const pendingChanges = applyTargetedChanges(
+      state.modifications,
+      state.repoPath
     );
+
+    let allDiffs = "";
+    for (const change of pendingChanges) {
+      allDiffs += change.diff;
+    }
+
+    setStreamedText((prev) => prev + "\n✨ Changes computed.\n\n" + allDiffs);
 
     return {
       diffs: allDiffs,
-      status: "completed",
+      pendingChanges,
+      status: "awaiting_confirmation",
     };
+  };
+
+  const saveChangesNode = async (state: typeof AgentState.State) => {
+    setStreamedText(
+      (prev) => prev + "\n💾 [SAVE] Waiting for user confirmation...\n"
+    );
+
+    const confirmed = await promptUserConfirmation();
+
+    if (confirmed) {
+      setStreamedText((prev) => prev + "\n✅ Saving changes...\n");
+
+      for (const change of state.pendingChanges || []) {
+        fs.writeFileSync(change.absPath, change.newContent, "utf8");
+        setStreamedText((prev) => prev + `   ✓ Saved: ${change.filePath}\n`);
+      }
+
+      setStreamedText(
+        (prev) => prev + "\n🎉 All changes saved successfully!\n"
+      );
+
+      return {
+        userConfirmed: true,
+        status: "completed",
+      };
+    } else {
+      setStreamedText((prev) => prev + "\n❌ Changes discarded by user.\n");
+
+      return {
+        userConfirmed: false,
+        status: "cancelled",
+      };
+    }
   };
 
   // --- Graph Build ---
@@ -390,7 +539,8 @@ FILE: sample/utils.py
     // Core processing nodes
     .addNode("think", thinkNode)
     .addNode("code", codeNode)
-    .addNode("verify", verifyNode);
+    .addNode("verify", verifyNode)
+    .addNode("saveChanges", saveChangesNode);
 
   // Connect chunked context gathering flow
   workflow.addEdge(START, "searchQdrant");
@@ -401,7 +551,8 @@ FILE: sample/utils.py
   workflow.addEdge("combineContext", "think");
   workflow.addEdge("think", "code");
   workflow.addEdge("code", "verify");
-  workflow.addEdge("verify", END);
+  workflow.addEdge("verify", "saveChanges");
+  workflow.addEdge("saveChanges", END);
 
   const app = workflow.compile();
 
@@ -410,8 +561,14 @@ FILE: sample/utils.py
     repoName,
     repoPath,
     status: "started",
+    pendingChanges: [],
+    userConfirmed: false,
     llmContext: { thinkerPromptSize: 0, coderPromptSize: 0 },
   });
 
-  return finalState.diffs;
+  return {
+    diffs: finalState.diffs,
+    userConfirmed: finalState.userConfirmed,
+    pendingChanges: finalState.pendingChanges,
+  };
 }

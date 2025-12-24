@@ -23,11 +23,13 @@ export type TokenUsage = {
 
 export interface OllamaCLI {
   streamedText: string;
-  status: number; // 0 = idle, 1 = loading, 2 = done, -1 = interrupted
+  status: number; // 0 = idle, 1 = loading, 2 = done, -1 = interrupted, 3 = awaiting confirmation
   tokenUsage: TokenUsage;
   handleQuery: (query: string) => Promise<void>;
   interrupt: () => void;
   embedString: (query: string) => Promise<number[]>;
+  confirmModification: (confirmed: boolean) => void;
+  pendingConfirmation: boolean;
   neo4j: Neo4jClient;
   qdrant: QdrantCli;
 }
@@ -41,6 +43,10 @@ export function useOllamaClient(model: string): OllamaCLI {
     completion: 0,
   });
   const abortRef = useRef<AbortController | null>(null);
+  const confirmationResolverRef = useRef<((confirmed: boolean) => void) | null>(
+    null
+  );
+  const [pendingConfirmation, setPendingConfirmation] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -63,7 +69,23 @@ export function useOllamaClient(model: string): OllamaCLI {
           invalidPromptError("No prompt provided");
           return;
         } else {
-          await langgraphModify(prompt, neo4j, qdrant, setStreamedText);
+          // Create a promise that will be resolved when user confirms/rejects
+          const promptUserConfirmation = (): Promise<boolean> => {
+            return new Promise((resolve) => {
+              confirmationResolverRef.current = resolve;
+              setPendingConfirmation(true);
+              setStatus(3); // awaiting confirmation
+            });
+          };
+
+          await langgraphModify(
+            prompt,
+            neo4j,
+            qdrant,
+            setStreamedText,
+            promptUserConfirmation
+          );
+          setPendingConfirmation(false);
           setStatus(2);
         }
       } else {
@@ -234,6 +256,14 @@ export function useOllamaClient(model: string): OllamaCLI {
     return data.embedding;
   }, []);
 
+  const confirmModification = useCallback((confirmed: boolean) => {
+    if (confirmationResolverRef.current) {
+      confirmationResolverRef.current(confirmed);
+      confirmationResolverRef.current = null;
+      setPendingConfirmation(false);
+    }
+  }, []);
+
   return {
     streamedText,
     status,
@@ -241,6 +271,8 @@ export function useOllamaClient(model: string): OllamaCLI {
     tokenUsage,
     interrupt,
     embedString,
+    confirmModification,
+    pendingConfirmation,
     neo4j,
     qdrant,
   };
