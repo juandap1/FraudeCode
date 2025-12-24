@@ -3,6 +3,7 @@ import summarizeProject from "./actions/summarize_project";
 import Neo4jClient from "./neo4jcli";
 import QdrantCli from "./qdrantcli";
 import modifyProject from "./actions/modify_project";
+import langgraphModify from "./actions/langgraph_modify";
 
 const neo4j = new Neo4jClient();
 const qdrant = new QdrantCli();
@@ -62,13 +63,7 @@ export function useOllamaClient(model: string): OllamaCLI {
           invalidPromptError("No prompt provided");
           return;
         } else {
-          await modifyProject(
-            prompt,
-            neo4j,
-            qdrant,
-            ollamaReturnQuery,
-            setStreamedText
-          );
+          await langgraphModify(prompt, neo4j, qdrant, setStreamedText);
           setStatus(2);
         }
       } else {
