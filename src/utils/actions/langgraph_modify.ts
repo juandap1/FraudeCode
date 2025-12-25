@@ -5,7 +5,6 @@ import Neo4jClient from "../neo4jcli";
 import QdrantCli from "../qdrantcli";
 import * as fs from "fs";
 import * as path from "path";
-import * as diff from "diff";
 
 // Define pending changes structure
 export interface PendingChange {
@@ -43,11 +42,14 @@ export default async function langgraphModify(
   query: string,
   neo4j: Neo4jClient,
   qdrant: QdrantCli,
-  setStreamedText: (updater: (prev: string) => string) => void,
+  updateOutput: (
+    type: "log" | "diff" | "confirmation" | "markdown",
+    content: string,
+    title?: string,
+    changes?: PendingChange[]
+  ) => void,
   promptUserConfirmation: () => Promise<boolean>,
-  setPendingChanges: (changes: PendingChange[]) => void,
-  setImplementationPlan: (plan: string) => void,
-  setImplementationLogs: (logs: string) => void
+  setPendingChanges: (changes: PendingChange[]) => void
 ) {
   const repoName = "sample";
   const repoPath = "/Users/mbranni03/Documents/GitHub/FraudeCode/sample";
@@ -64,13 +66,9 @@ export default async function langgraphModify(
     temperature: 0,
   });
 
-  // --- Nodes ---
-
   // Step 1: Search Qdrant for semantic context
   const searchQdrantNode = async (state: typeof AgentState.State) => {
-    setStreamedText(
-      () => "🔍 [STEP 1/4] Searching Qdrant vector database...\n"
-    );
+    updateOutput("log", "🔍 [STEP 1/4] Searching Qdrant vector database...");
 
     const searchResults = await qdrant.hybridSearch(
       state.repoName,
@@ -88,9 +86,7 @@ export default async function langgraphModify(
       }
     }
 
-    setStreamedText(
-      (prev) => prev + `   Found ${filePaths.length} relevant files.\n`
-    );
+    updateOutput("log", `Found ${filePaths.length} relevant files.`);
 
     return {
       qdrantResults: searchResults || [],
@@ -101,9 +97,9 @@ export default async function langgraphModify(
 
   // Step 2: Search Neo4j for structural context
   const searchNeo4jNode = async (state: typeof AgentState.State) => {
-    setStreamedText(
-      (prev) =>
-        prev + "\n🧬 [STEP 2/4] Searching Neo4j for structural context...\n"
+    updateOutput(
+      "log",
+      "🧬 [STEP 2/4] Searching Neo4j for structural context..."
     );
 
     const words = state.query.split(/\W+/);
@@ -111,25 +107,24 @@ export default async function langgraphModify(
 
     for (const word of words) {
       if (word.length < 3) continue;
-      setStreamedText((prev) => prev + `   Inspecting symbol: "${word}"...\n`);
+      updateOutput("log", `Inspecting symbol: "${word}"...`);
       const symContext = await neo4j.getContextBySymbol(word);
       if (symContext.length > 0) {
         structuralContext +=
-          `\nSymbol info for "${word}":\n` +
+          `Symbol info for "${word}":` +
           JSON.stringify(symContext, null, 2) +
-          "\n";
+          "";
       }
     }
 
     const foundSymbols = structuralContext.length > 0;
-    setStreamedText(
-      (prev) =>
-        prev +
-        `   ${
-          foundSymbols
-            ? "Structural context found."
-            : "No structural context found."
-        }\n`
+    updateOutput(
+      "log",
+      `${
+        foundSymbols
+          ? "Structural context found."
+          : "No structural context found."
+      }`
     );
 
     return {
@@ -140,29 +135,24 @@ export default async function langgraphModify(
 
   // Step 3: Read file contents from discovered paths
   const gatherFilesNode = async (state: typeof AgentState.State) => {
-    setStreamedText(
-      (prev) => prev + "\n📄 [STEP 3/4] Reading file contents...\n"
-    );
+    updateOutput("log", "📄 [STEP 3/4] Reading file contents...");
 
     const fileContents: Record<string, string> = {};
 
     for (const filePath of state.filePaths || []) {
       const absPath = path.join(state.repoPath, "..", filePath);
       if (fs.existsSync(absPath)) {
-        setStreamedText((prev) => prev + `   Reading: ${filePath}\n`);
+        updateOutput("log", `Reading: ${filePath}`);
         fileContents[filePath] = fs.readFileSync(absPath, "utf8");
       }
     }
 
     let codeContext = "";
     for (const [filePath, content] of Object.entries(fileContents)) {
-      codeContext += `--- FILE: ${filePath} ---\n${content}\n\n`;
+      codeContext += `--- FILE: ${filePath} ---${content}`;
     }
 
-    setStreamedText(
-      (prev) =>
-        prev + `   Loaded ${Object.keys(fileContents).length} file(s).\n`
-    );
+    updateOutput("log", `Loaded ${Object.keys(fileContents).length} file(s).`);
 
     return {
       codeContext,
@@ -172,22 +162,21 @@ export default async function langgraphModify(
 
   // Step 4: Combine and finalize context
   const combineContextNode = async (state: typeof AgentState.State) => {
-    setStreamedText((prev) => prev + "\n📦 [STEP 4/4] Combining context...\n");
+    updateOutput("log", "📦 [STEP 4/4] Combining context...");
 
     // Context is already combined in state, just validate
     const codeContextSize = state.codeContext?.length || 0;
     const structuralContextSize = state.structuralContext?.length || 0;
 
-    setStreamedText(
-      (prev) =>
-        prev +
-        `   Code context: ${
-          codeContextSize > 0 ? "✓" : "✗"
-        } (${codeContextSize} chars)\n` +
-        `   Structural context: ${
+    updateOutput(
+      "log",
+      `Code context: ${
+        codeContextSize > 0 ? "✓" : "✗"
+      } (${codeContextSize} chars)` +
+        `Structural context: ${
           structuralContextSize > 0 ? "✓" : "✗"
-        } (${structuralContextSize} chars)\n` +
-        "\n✅ Context gathering complete.\n"
+        } (${structuralContextSize} chars)` +
+        "✅ Context gathering complete."
     );
 
     return {
@@ -196,10 +185,7 @@ export default async function langgraphModify(
   };
 
   const thinkNode = async (state: typeof AgentState.State) => {
-    setStreamedText(
-      (prev) =>
-        prev + "\n🧠 [THINKING] Analyzing requirements (qwen3:8b)...\n\n"
-    );
+    updateOutput("log", "🧠 [THINKING] Analyzing requirements (qwen3:8b)...");
 
     const prompt = `
 You are an expert software engineer. Your task is to plan how to modify the code in the project based on the user's request.
@@ -218,19 +204,19 @@ Output your plan as a detailed technical specification. Begin immediately.
 `;
 
     const promptSize = prompt.length;
-    setStreamedText(
-      (prev) => prev + `   Thinker prompt size: ${promptSize} characters\n\n`
-    );
+    updateOutput("log", `Thinker prompt size: ${promptSize} characters`);
 
+    // Create a dedicated output item for the plan
+    updateOutput("markdown", "", "Implementation Plan");
     let thinkingProcess = "";
     const stream = await thinkerModel.stream([new HumanMessage(prompt)]);
     for await (const chunk of stream) {
       const content = chunk.content as string;
       thinkingProcess += content;
-      setImplementationPlan(thinkingProcess);
+      updateOutput("markdown", thinkingProcess, "Implementation Plan");
     }
 
-    setStreamedText((prev) => prev + "   Planning complete.\n");
+    updateOutput("log", "Planning complete.");
 
     return {
       thinkingProcess,
@@ -243,10 +229,9 @@ Output your plan as a detailed technical specification. Begin immediately.
   };
 
   const codeNode = async (state: typeof AgentState.State) => {
-    setStreamedText(
-      (prev) =>
-        prev +
-        "\n💻 [IMPLEMENTATION] Generating code changes (llama3.1:latest)...\n\n"
+    updateOutput(
+      "log",
+      "💻 [IMPLEMENTATION] Generating code changes (llama3.1:latest)..."
     );
 
     const prompt = `
@@ -302,19 +287,17 @@ IMPORTANT:
 `;
 
     const promptSize = prompt.length;
-    setStreamedText(
-      (prev) => prev + `   Coder prompt size: ${promptSize} characters\n\n`
-    );
+    updateOutput("log", `Coder prompt size: ${promptSize} characters`);
 
     let modifications = "";
     const stream = await coderModel.stream([new HumanMessage(prompt)]);
     for await (const chunk of stream) {
       const content = chunk.content as string;
       modifications += content;
-      setImplementationLogs(modifications);
+      updateOutput("markdown", modifications, "Implementation Details");
     }
 
-    setStreamedText((prev) => prev + "   Implementation complete.\n");
+    updateOutput("log", "Implementation complete.");
 
     return {
       modifications,
@@ -343,7 +326,7 @@ IMPORTANT:
     );
 
     for (const block of fileBlocks) {
-      const lines = block.split("\n");
+      const lines = block.split("");
       // Clean up the filePath: remove trailing ** and whitespace
       let filePath = lines[0]?.trim().replace(/\*+$/, "").trim();
 
@@ -380,7 +363,7 @@ IMPORTANT:
       // Parse AT LINE sections - more flexible regex to handle variations
       // Handles: "AT LINE 1:" or "AT LINE 10 (after something):" etc.
       const atLineRegex =
-        /AT LINE (\d+)[^:]*:\s*(?:REMOVE:\s*```(?:\w+)?\n([\s\S]*?)```)?[\s\S]*?(?:ADD:\s*```(?:\w+)?\n([\s\S]*?)```)?/gi;
+        /AT LINE (\d+)[^:]*:\s*(?:REMOVE:\s*```(?:\w+)?([\s\S]*?)```)?[\s\S]*?(?:ADD:\s*```(?:\w+)?([\s\S]*?)```)?/gi;
       let match;
       const changes: { line: number; remove?: string; add?: string }[] = [];
 
@@ -405,10 +388,10 @@ IMPORTANT:
       // Apply changes in reverse order to preserve line numbers
       changes.sort((a, b) => b.line - a.line);
 
-      const contentLines = newContent.split("\n");
+      const contentLines = newContent.split("");
       for (const change of changes) {
         if (change.remove) {
-          const removeLines = change.remove.split("\n");
+          const removeLines = change.remove.split("");
           // Find and remove the matching lines
           const startIdx = change.line - 1;
           let matchFound = true;
@@ -425,13 +408,13 @@ IMPORTANT:
           }
         }
         if (change.add) {
-          const addLines = change.add.split("\n");
+          const addLines = change.add.split("");
           const insertIdx = change.line - 1;
           contentLines.splice(insertIdx, 0, ...addLines);
         }
       }
 
-      newContent = contentLines.join("\n");
+      newContent = contentLines.join("");
 
       pendingChanges.push({
         filePath,
@@ -445,7 +428,7 @@ IMPORTANT:
   };
 
   const verifyNode = async (state: typeof AgentState.State) => {
-    setStreamedText((prev) => prev + "\n📉 [DIFF] Computing changes...\n");
+    updateOutput("log", "📉 [DIFF] Computing changes...");
 
     const pendingChanges = applyTargetedChanges(
       state.modifications,
@@ -461,9 +444,10 @@ IMPORTANT:
 
     setPendingChanges(pendingChanges);
 
-    setStreamedText(
-      (prev) => prev + `   ${pendingChanges.length} change(s) computed.\n`
-    );
+    // Add a diff output item for the changes
+    updateOutput("diff", "", "Code Changes", pendingChanges);
+
+    updateOutput("log", `${pendingChanges.length} change(s) computed.`);
 
     return {
       pendingChanges,
@@ -472,9 +456,7 @@ IMPORTANT:
   };
 
   const saveChangesNode = async (state: typeof AgentState.State) => {
-    setStreamedText(
-      (prev) => prev + "\n💾 [SAVE] Waiting for user confirmation...\n"
-    );
+    updateOutput("log", "💾 [SAVE] Waiting for user confirmation...");
 
     const confirmed = await promptUserConfirmation();
 
@@ -484,10 +466,9 @@ IMPORTANT:
         `[saveChangesNode] confirmed=true, changesToSave.length=${changesToSave.length}`
       );
 
-      setStreamedText(
-        (prev) =>
-          prev +
-          `✅ User confirmed. Saving ${changesToSave.length} change(s)...\n`
+      updateOutput(
+        "log",
+        `✅ User confirmed. Saving ${changesToSave.length} change(s)...`
       );
 
       for (const change of changesToSave) {
@@ -497,23 +478,21 @@ IMPORTANT:
         );
         try {
           fs.writeFileSync(change.absPath, change.newContent, "utf8");
-          setStreamedText((prev) => prev + `   ✓ Saved: ${change.filePath}\n`);
+          updateOutput("log", `✓ Saved: ${change.filePath}`);
         } catch (err) {
           console.error(`[saveChanges] Error writing file: ${err}`);
-          setStreamedText((prev) => prev + `   ✗ Failed: ${change.filePath}\n`);
+          updateOutput("log", `✗ Failed: ${change.filePath}`);
         }
       }
 
-      setStreamedText(
-        (prev) => prev + "\n🎉 All changes saved successfully!\n"
-      );
+      updateOutput("log", "🎉 All changes saved successfully!");
 
       return {
         userConfirmed: true,
         status: "completed",
       };
     } else {
-      setStreamedText((prev) => prev + "\n❌ Changes discarded by user.\n");
+      updateOutput("log", "❌ Changes discarded by user.");
 
       return {
         userConfirmed: false,

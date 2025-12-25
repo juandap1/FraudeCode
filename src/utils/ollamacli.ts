@@ -5,6 +5,7 @@ import QdrantCli from "./qdrantcli";
 import modifyProject from "./actions/modify_project";
 import type { PendingChange } from "./actions/langgraph_modify";
 import langgraphModify from "./actions/langgraph_modify";
+import log from "./logger";
 
 const neo4j = new Neo4jClient();
 const qdrant = new QdrantCli();
@@ -22,8 +23,18 @@ export type TokenUsage = {
   completion: number;
 };
 
+export type OutputItemType = "log" | "markdown" | "diff" | "confirmation";
+
+export interface OutputItem {
+  id: string;
+  type: OutputItemType;
+  content: string;
+  title?: string;
+  changes?: PendingChange[];
+}
+
 export interface OllamaCLI {
-  streamedText: string;
+  outputItems: OutputItem[];
   status: number; // 0 = idle, 1 = loading, 2 = done, -1 = interrupted, 3 = awaiting confirmation
   tokenUsage: TokenUsage;
   handleQuery: (query: string) => Promise<void>;
@@ -32,14 +43,19 @@ export interface OllamaCLI {
   confirmModification: (confirmed: boolean) => void;
   pendingConfirmation: boolean;
   pendingChanges: PendingChange[];
-  implementationPlan: string;
-  implementationLogs: string;
+  updateOutput: (
+    type: OutputItemType,
+    content: string,
+    title?: string,
+    changes?: PendingChange[]
+  ) => void;
   neo4j: Neo4jClient;
   qdrant: QdrantCli;
 }
 
 export function useOllamaClient(model: string): OllamaCLI {
-  const [streamedText, setStreamedText] = useState("");
+  const [outputItems, setOutputItems] = useState<OutputItem[]>([]);
+  const itemsRef = useRef<OutputItem[]>([]);
   const [status, setStatus] = useState(0);
   const [tokenUsage, setTokenUsage] = useState<TokenUsage>({
     total: 0,
@@ -52,8 +68,35 @@ export function useOllamaClient(model: string): OllamaCLI {
   );
   const [pendingConfirmation, setPendingConfirmation] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
-  const [implementationPlan, setImplementationPlan] = useState("");
-  const [implementationLogs, setImplementationLogs] = useState("");
+
+  const lastUpdateRef = useRef<number>(0);
+
+  // Helper to add a new output item (returns the ID for subsequent updates)
+  const updateOutput = useCallback(
+    (
+      type: OutputItemType,
+      content: string,
+      title?: string,
+      changes?: PendingChange[]
+    ) => {
+      setOutputItems((prev) => {
+        const last = prev[prev.length - 1];
+        // If we have a title, and it matches the last item's title and type,
+        // we replace the content (useful for streaming or updating specific sections).
+        // If no title is provided, we treat it as a new log entry.
+        if (last && last.type === type && last.type !== "log") {
+          return [...prev.slice(0, -1), { ...last, content, changes }];
+        } else {
+          return [
+            ...prev,
+            { id: crypto.randomUUID(), type, content, title, changes },
+          ];
+        }
+      });
+      lastUpdateRef.current = Date.now();
+    },
+    []
+  );
 
   useEffect(() => {
     return () => {
@@ -66,10 +109,12 @@ export function useOllamaClient(model: string): OllamaCLI {
   const handleQuery = useCallback(
     async (query: string) => {
       setStatus(1);
-      setStreamedText("");
+      itemsRef.current = []; // Clear previous output
+      setOutputItems([]);
 
       if (query.trim() == "/summarize") {
         await summarizeProject(neo4j, qdrant, ollamaStreamQuery);
+        setStatus(2);
       } else if (query.trim().startsWith("/modify")) {
         let prompt = query.trim().split(" ").slice(1).join(" ") || "";
         if (prompt.length == 0) {
@@ -89,11 +134,9 @@ export function useOllamaClient(model: string): OllamaCLI {
             prompt,
             neo4j,
             qdrant,
-            setStreamedText,
+            updateOutput,
             promptUserConfirmation,
-            setPendingChanges,
-            setImplementationPlan,
-            setImplementationLogs
+            setPendingChanges
           );
           setPendingConfirmation(false);
           setStatus(2);
@@ -102,7 +145,7 @@ export function useOllamaClient(model: string): OllamaCLI {
         invalidPromptError("Command not found");
       }
     },
-    [model]
+    [model, updateOutput]
   );
 
   const ollamaStreamQuery = useCallback(
@@ -132,6 +175,11 @@ export function useOllamaClient(model: string): OllamaCLI {
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
 
+        // Create a streaming output item
+        const streamTitle = "Ollama Response";
+        updateOutput("log", "", streamTitle);
+        let accumulated = "";
+
         while (true) {
           if (abortRef.current?.signal.aborted) {
             reader.cancel();
@@ -149,7 +197,8 @@ export function useOllamaClient(model: string): OllamaCLI {
               const content = data.message?.content;
 
               if (content) {
-                setStreamedText((prev) => prev + content);
+                accumulated += content;
+                updateOutput("log", accumulated, streamTitle);
               }
 
               if (data.done) {
@@ -177,7 +226,7 @@ export function useOllamaClient(model: string): OllamaCLI {
         setStatus(2);
       }
     },
-    [model]
+    [model, updateOutput]
   );
 
   const ollamaReturnQuery = useCallback(
@@ -226,10 +275,13 @@ export function useOllamaClient(model: string): OllamaCLI {
     [model]
   );
 
-  const invalidPromptError = useCallback((message?: string) => {
-    setStatus(2);
-    setStreamedText(message || "Command not found");
-  }, []);
+  const invalidPromptError = useCallback(
+    (message?: string) => {
+      setStatus(2);
+      updateOutput("log", message || "Command not found");
+    },
+    [updateOutput]
+  );
 
   const interrupt = useCallback(() => {
     if (abortRef.current) {
@@ -275,7 +327,7 @@ export function useOllamaClient(model: string): OllamaCLI {
   }, []);
 
   return {
-    streamedText,
+    outputItems,
     status,
     handleQuery,
     tokenUsage,
@@ -284,8 +336,7 @@ export function useOllamaClient(model: string): OllamaCLI {
     confirmModification,
     pendingConfirmation,
     pendingChanges,
-    implementationPlan,
-    implementationLogs,
+    updateOutput,
     neo4j,
     qdrant,
   };
