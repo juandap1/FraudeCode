@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
+    "@inkkit/ink-markdown": "^1.0.0",
     "@langchain/core": "^1.1.8",
     "@langchain/langgraph": "^1.0.7",
     "@langchain/ollama": "^1.1.0",

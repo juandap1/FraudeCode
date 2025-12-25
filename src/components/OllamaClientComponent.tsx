@@ -1,5 +1,6 @@
 import { Box, Text } from "ink";
 import SelectInput from "ink-select-input";
+import Markdown from "@inkkit/ink-markdown";
 import * as diff from "diff";
 import type { OllamaCLI } from "../utils/ollamacli";
 import LoaderComponent from "./LoaderComponent";
@@ -12,16 +13,32 @@ type SelectItem = {
 };
 
 const DiffViewer = ({ changes }: { changes: PendingChange[] }) => {
+  console.log(`[DiffViewer] Received ${changes?.length || 0} changes`);
+
+  if (!changes || changes.length === 0) {
+    return null;
+  }
+
   // Group all changes by file path to ensure one box per file
   const consolidated = changes.reduce((acc, curr) => {
     acc[curr.filePath] = curr;
     return acc;
   }, {} as Record<string, PendingChange>);
 
+  console.log(
+    `[DiffViewer] Consolidated to ${Object.keys(consolidated).length} files`
+  );
+
   return (
     <Box flexDirection="column" marginTop={1}>
       {Object.values(consolidated).map((change, fIndex) => {
-        const diffLines = diff.diffLines(change.oldContent, change.newContent);
+        console.log(
+          `[DiffViewer] File ${fIndex}: ${change.filePath}, oldLen=${change.oldContent?.length}, newLen=${change.newContent?.length}`
+        );
+        const diffLines = diff.diffLines(
+          change.oldContent || "",
+          change.newContent || ""
+        );
 
         // Process diff lines into a unified list with metadata
         const processedLines: {
@@ -184,9 +201,49 @@ const OllamaClientComponent = ({
     OllamaClient.confirmModification(item.value);
   };
 
+  console.log(
+    `[OllamaClientComponent] pendingChanges.length = ${
+      OllamaClient.pendingChanges?.length || 0
+    }`
+  );
+
   return (
     <Box flexDirection="column">
-      <Text>{OllamaClient.streamedText}</Text>
+      {OllamaClient.streamedText && (
+        <Box marginBottom={1}>
+          <Text>{OllamaClient.streamedText}</Text>
+        </Box>
+      )}
+
+      {OllamaClient.implementationPlan && (
+        <Box
+          flexDirection="column"
+          borderStyle="round"
+          borderColor="dim"
+          paddingX={1}
+          marginBottom={1}
+        >
+          <Text bold>Implementation Plan:</Text>
+          <Box marginTop={1}>
+            <Markdown>{OllamaClient.implementationPlan}</Markdown>
+          </Box>
+        </Box>
+      )}
+
+      {OllamaClient.implementationLogs && (
+        <Box
+          flexDirection="column"
+          borderStyle="round"
+          borderColor="dim"
+          paddingX={1}
+          marginBottom={1}
+        >
+          <Text bold>Status:</Text>
+          <Box marginTop={1}>
+            <Text color="dim">{OllamaClient.implementationLogs}</Text>
+          </Box>
+        </Box>
+      )}
 
       {OllamaClient.pendingChanges.length > 0 && (
         <DiffViewer changes={OllamaClient.pendingChanges} />

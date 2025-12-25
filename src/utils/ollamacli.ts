@@ -32,6 +32,8 @@ export interface OllamaCLI {
   confirmModification: (confirmed: boolean) => void;
   pendingConfirmation: boolean;
   pendingChanges: PendingChange[];
+  implementationPlan: string;
+  implementationLogs: string;
   neo4j: Neo4jClient;
   qdrant: QdrantCli;
 }
@@ -50,6 +52,8 @@ export function useOllamaClient(model: string): OllamaCLI {
   );
   const [pendingConfirmation, setPendingConfirmation] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
+  const [implementationPlan, setImplementationPlan] = useState("");
+  const [implementationLogs, setImplementationLogs] = useState("");
 
   useEffect(() => {
     return () => {
@@ -87,7 +91,9 @@ export function useOllamaClient(model: string): OllamaCLI {
             qdrant,
             setStreamedText,
             promptUserConfirmation,
-            setPendingChanges
+            setPendingChanges,
+            setImplementationPlan,
+            setImplementationLogs
           );
           setPendingConfirmation(false);
           setStatus(2);
@@ -278,6 +284,8 @@ export function useOllamaClient(model: string): OllamaCLI {
     confirmModification,
     pendingConfirmation,
     pendingChanges,
+    implementationPlan,
+    implementationLogs,
     neo4j,
     qdrant,
   };

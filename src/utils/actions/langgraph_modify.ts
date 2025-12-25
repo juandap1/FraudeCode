@@ -45,7 +45,9 @@ export default async function langgraphModify(
   qdrant: QdrantCli,
   setStreamedText: (updater: (prev: string) => string) => void,
   promptUserConfirmation: () => Promise<boolean>,
-  setPendingChanges: (changes: PendingChange[]) => void
+  setPendingChanges: (changes: PendingChange[]) => void,
+  setImplementationPlan: (plan: string) => void,
+  setImplementationLogs: (logs: string) => void
 ) {
   const repoName = "sample";
   const repoPath = "/Users/mbranni03/Documents/GitHub/FraudeCode/sample";
@@ -225,10 +227,10 @@ Output your plan as a detailed technical specification. Begin immediately.
     for await (const chunk of stream) {
       const content = chunk.content as string;
       thinkingProcess += content;
-      setStreamedText((prev) => prev + content);
+      setImplementationPlan(thinkingProcess);
     }
 
-    setStreamedText((prev) => prev + "\n\n💡 Planning complete.\n");
+    setStreamedText((prev) => prev + "   Planning complete.\n");
 
     return {
       thinkingProcess,
@@ -309,10 +311,10 @@ IMPORTANT:
     for await (const chunk of stream) {
       const content = chunk.content as string;
       modifications += content;
-      setStreamedText((prev) => prev + content);
+      setImplementationLogs(modifications);
     }
 
-    setStreamedText((prev) => prev + "\n\n🛠️ Implementation complete.\n");
+    setStreamedText((prev) => prev + "   Implementation complete.\n");
 
     return {
       modifications,
@@ -330,21 +332,44 @@ IMPORTANT:
     repoPath: string
   ): PendingChange[] => {
     const pendingChanges: PendingChange[] = [];
+
+    // Handle markdown formatting: **FILE: path** or FILE: path
     const fileBlocks = modifications
-      .split(/FILE: /)
+      .split(/\*{0,2}FILE:\s*/)
       .filter((b) => b.trim().length > 0);
+
+    console.log(
+      `[applyTargetedChanges] Found ${fileBlocks.length} file blocks`
+    );
 
     for (const block of fileBlocks) {
       const lines = block.split("\n");
-      const filePath = lines[0]?.trim();
+      // Clean up the filePath: remove trailing ** and whitespace
+      let filePath = lines[0]?.trim().replace(/\*+$/, "").trim();
+
+      console.log(`[applyTargetedChanges] Parsed filePath: "${filePath}"`);
 
       // Skip if filePath doesn't look like an actual file path
       // (must contain a / or have a file extension like .py, .ts, etc.)
       if (!filePath || (!filePath.includes("/") && !filePath.match(/\.\w+$/))) {
+        console.log(
+          `[applyTargetedChanges] Skipped invalid filePath: "${filePath}"`
+        );
         continue;
       }
 
-      const absPath = path.join(repoPath, "..", filePath);
+      // Build absolute path
+      // Handle cases where the path might already start with "sample/" or be relative to it
+      let relativePath = filePath;
+      if (filePath.startsWith("sample/")) {
+        relativePath = filePath.substring(7);
+      }
+      const absPath = path.join(repoPath, relativePath);
+
+      console.log(
+        `[applyTargetedChanges] Resolving: ${filePath} -> ${absPath}`
+      );
+
       let oldContent = "";
       if (fs.existsSync(absPath)) {
         oldContent = fs.readFileSync(absPath, "utf8");
@@ -352,14 +377,22 @@ IMPORTANT:
 
       let newContent = oldContent;
 
-      // Parse AT LINE sections
+      // Parse AT LINE sections - more flexible regex to handle variations
+      // Handles: "AT LINE 1:" or "AT LINE 10 (after something):" etc.
       const atLineRegex =
-        /AT LINE (\d+):\s*(?:REMOVE:\s*```(?:\w+)?\n([\s\S]*?)```)?\s*(?:ADD:\s*```(?:\w+)?\n([\s\S]*?)```)?/g;
+        /AT LINE (\d+)[^:]*:\s*(?:REMOVE:\s*```(?:\w+)?\n([\s\S]*?)```)?[\s\S]*?(?:ADD:\s*```(?:\w+)?\n([\s\S]*?)```)?/gi;
       let match;
       const changes: { line: number; remove?: string; add?: string }[] = [];
 
+      console.log(
+        `[applyTargetedChanges] Parsing AT LINE sections for ${filePath}`
+      );
+
       while ((match = atLineRegex.exec(block)) !== null) {
         const lineNum = match[1];
+        console.log(
+          `[applyTargetedChanges] Found AT LINE ${lineNum}, remove=${!!match[2]}, add=${!!match[3]}`
+        );
         if (lineNum) {
           changes.push({
             line: parseInt(lineNum, 10),
@@ -419,9 +452,18 @@ IMPORTANT:
       state.repoPath
     );
 
+    console.log(
+      `[verifyNode] Computed ${pendingChanges.length} pending changes:`
+    );
+    for (const change of pendingChanges) {
+      console.log(`  - ${change.filePath} -> ${change.absPath}`);
+    }
+
     setPendingChanges(pendingChanges);
 
-    setStreamedText((prev) => prev + "\n✨ Changes computed.\n");
+    setStreamedText(
+      (prev) => prev + `   ${pendingChanges.length} change(s) computed.\n`
+    );
 
     return {
       pendingChanges,
@@ -437,11 +479,29 @@ IMPORTANT:
     const confirmed = await promptUserConfirmation();
 
     if (confirmed) {
-      setStreamedText((prev) => prev + "\n✅ Saving changes...\n");
+      const changesToSave = state.pendingChanges || [];
+      console.log(
+        `[saveChangesNode] confirmed=true, changesToSave.length=${changesToSave.length}`
+      );
 
-      for (const change of state.pendingChanges || []) {
-        fs.writeFileSync(change.absPath, change.newContent, "utf8");
-        setStreamedText((prev) => prev + `   ✓ Saved: ${change.filePath}\n`);
+      setStreamedText(
+        (prev) =>
+          prev +
+          `✅ User confirmed. Saving ${changesToSave.length} change(s)...\n`
+      );
+
+      for (const change of changesToSave) {
+        console.log(`[saveChanges] Writing to: ${change.absPath}`);
+        console.log(
+          `[saveChanges] newContent length: ${change.newContent?.length}`
+        );
+        try {
+          fs.writeFileSync(change.absPath, change.newContent, "utf8");
+          setStreamedText((prev) => prev + `   ✓ Saved: ${change.filePath}\n`);
+        } catch (err) {
+          console.error(`[saveChanges] Error writing file: ${err}`);
+          setStreamedText((prev) => prev + `   ✗ Failed: ${change.filePath}\n`);
+        }
       }
 
       setStreamedText(
@@ -490,7 +550,7 @@ IMPORTANT:
 
   const app = workflow.compile();
 
-  const finalState = await app.invoke({
+  const finalState = (await app.invoke({
     query,
     repoName,
     repoPath,
@@ -498,11 +558,11 @@ IMPORTANT:
     pendingChanges: [],
     userConfirmed: false,
     llmContext: { thinkerPromptSize: 0, coderPromptSize: 0 },
-  });
+  })) as any;
 
   return {
     diffs: finalState.diffs,
     userConfirmed: finalState.userConfirmed,
-    pendingChanges: finalState.pendingChanges,
+    pendingChanges: finalState.pendingChanges || [],
   };
 }
