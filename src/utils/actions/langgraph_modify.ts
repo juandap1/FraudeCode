@@ -7,38 +7,12 @@ import * as fs from "fs";
 import * as path from "path";
 import * as diff from "diff";
 
-// ANSI color codes for diff styling
-const COLORS = {
-  green: "\x1b[32m",
-  red: "\x1b[31m",
-  dim: "\x1b[2m",
-  reset: "\x1b[0m",
-  bold: "\x1b[1m",
-};
-
-// Helper function to format diff lines with colors
-function formatDiffLine(
-  type: "added" | "removed" | "context",
-  lineNum: string,
-  content: string
-): string {
-  switch (type) {
-    case "added":
-      return `${COLORS.green}      [${lineNum}] + ${content}${COLORS.reset}\n`;
-    case "removed":
-      return `${COLORS.red}[${lineNum}]       - ${content}${COLORS.reset}\n`;
-    case "context":
-      return `${COLORS.dim}${lineNum}   ${content}${COLORS.reset}\n`;
-  }
-}
-
 // Define pending changes structure
 export interface PendingChange {
   filePath: string;
   absPath: string;
   oldContent: string;
   newContent: string;
-  diff: string;
 }
 
 // Define the state of our graph
@@ -70,7 +44,8 @@ export default async function langgraphModify(
   neo4j: Neo4jClient,
   qdrant: QdrantCli,
   setStreamedText: (updater: (prev: string) => string) => void,
-  promptUserConfirmation: () => Promise<boolean>
+  promptUserConfirmation: () => Promise<boolean>,
+  setPendingChanges: (changes: PendingChange[]) => void
 ) {
   const repoName = "sample";
   const repoPath = "/Users/mbranni03/Documents/GitHub/FraudeCode/sample";
@@ -425,48 +400,11 @@ IMPORTANT:
 
       newContent = contentLines.join("\n");
 
-      // Compute diff
-      const diffChanges = diff.diffLines(oldContent, newContent);
-      let oldLine = 1;
-      let newLine = 1;
-      let fileDiff = `\n--- DIFF FOR ${filePath} ---\n`;
-
-      diffChanges.forEach((part: diff.Change) => {
-        const partLines = part.value.split("\n");
-        if (partLines[partLines.length - 1] === "") partLines.pop();
-
-        partLines.forEach((line: string) => {
-          if (part.added) {
-            fileDiff += formatDiffLine(
-              "added",
-              newLine.toString().padStart(3),
-              line
-            );
-            newLine++;
-          } else if (part.removed) {
-            fileDiff += formatDiffLine(
-              "removed",
-              oldLine.toString().padStart(3),
-              line
-            );
-            oldLine++;
-          } else {
-            const contextLineNum = `[${oldLine
-              .toString()
-              .padStart(3)}][${newLine.toString().padStart(3)}]`;
-            fileDiff += formatDiffLine("context", contextLineNum, line);
-            oldLine++;
-            newLine++;
-          }
-        });
-      });
-
       pendingChanges.push({
         filePath,
         absPath,
         oldContent,
         newContent,
-        diff: fileDiff,
       });
     }
 
@@ -481,15 +419,11 @@ IMPORTANT:
       state.repoPath
     );
 
-    let allDiffs = "";
-    for (const change of pendingChanges) {
-      allDiffs += change.diff;
-    }
+    setPendingChanges(pendingChanges);
 
-    setStreamedText((prev) => prev + "\n✨ Changes computed.\n\n" + allDiffs);
+    setStreamedText((prev) => prev + "\n✨ Changes computed.\n");
 
     return {
-      diffs: allDiffs,
       pendingChanges,
       status: "awaiting_confirmation",
     };

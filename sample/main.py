@@ -3,9 +3,8 @@ import utils
 def calculate():
     x = utils.add(2, 3)
     y = utils.multiply(x, utils.CONSTANT_VALUE)
-    z = utils.subtract(y, x)  
-    w = utils.divide(y, x)  # new line added to use the divide function
-    return w
+    z = utils.subtract(y, x)
+    return z
 
 def power(base, exponent):
     result = base ** exponent
