@@ -229,7 +229,8 @@ export default async function langgraphModify(
     changes?: PendingChange[]
   ) => void,
   promptUserConfirmation: () => Promise<boolean>,
-  setPendingChanges: (changes: PendingChange[]) => void
+  setPendingChanges: (changes: PendingChange[]) => void,
+  signal?: AbortSignal
 ) {
   const repoName = "sample";
   const repoPath = "/Users/mbranni03/Documents/GitHub/FraudeCode/sample";
@@ -367,7 +368,9 @@ export default async function langgraphModify(
     // Create a dedicated output item for the plan
     updateOutput("markdown", "", "Implementation Plan");
     let thinkingProcess = "";
-    const stream = await thinkerModel.stream([new HumanMessage(prompt)]);
+    const stream = await thinkerModel.stream([new HumanMessage(prompt)], {
+      signal,
+    });
     for await (const chunk of stream) {
       const content = chunk.content as string;
       thinkingProcess += content;
@@ -402,7 +405,9 @@ export default async function langgraphModify(
     updateOutput("log", `Coder prompt size: ${promptSize} characters`);
 
     let modifications = "";
-    const stream = await coderModel.stream([new HumanMessage(prompt)]);
+    const stream = await coderModel.stream([new HumanMessage(prompt)], {
+      signal,
+    });
     for await (const chunk of stream) {
       const content = chunk.content as string;
       modifications += content;
@@ -527,15 +532,18 @@ export default async function langgraphModify(
 
   const app = workflow.compile();
 
-  const finalState = (await app.invoke({
-    query,
-    repoName,
-    repoPath,
-    status: "started",
-    pendingChanges: [],
-    userConfirmed: false,
-    llmContext: { thinkerPromptSize: 0, coderPromptSize: 0 },
-  })) as any;
+  const finalState = (await app.invoke(
+    {
+      query,
+      repoName,
+      repoPath,
+      status: "started",
+      pendingChanges: [],
+      userConfirmed: false,
+      llmContext: { thinkerPromptSize: 0, coderPromptSize: 0 },
+    },
+    { signal }
+  )) as any;
 
   return {
     diffs: finalState.diffs,

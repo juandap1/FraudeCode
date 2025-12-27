@@ -85,7 +85,7 @@ export function useOllamaClient(model: string): OllamaCLI {
 
   const lastUpdateRef = useRef<number>(0);
 
-  // Helper to add a new output item (returns the ID for subsequent updates)
+  // Helper to add a new output item
   const updateOutput = useCallback(
     (
       type: OutputItemType,
@@ -112,6 +112,15 @@ export function useOllamaClient(model: string): OllamaCLI {
     []
   );
 
+  // Create a promise that will be resolved when user confirms/rejects
+  const promptUserConfirmation = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      confirmationResolverRef.current = resolve;
+      setPendingConfirmation(true);
+      setStatus(3); // awaiting confirmation
+    });
+  };
+
   useEffect(() => {
     return () => {
       if (abortRef.current) {
@@ -122,174 +131,50 @@ export function useOllamaClient(model: string): OllamaCLI {
 
   const handleQuery = useCallback(
     async (query: string) => {
-      setStatus(1);
-      itemsRef.current = []; // Clear previous output
-      setOutputItems([]);
-      updateOutput("command", query);
+      try {
+        setStatus(1);
+        itemsRef.current = []; // Clear previous output
+        setOutputItems([]);
+        updateOutput("command", query);
 
-      if (query.trim() == "/summarize") {
-        await summarizeProject(neo4j, qdrant, ollamaStreamQuery);
-        setStatus(2);
-      } else if (query.trim().startsWith("/modify")) {
-        let prompt = query.trim().split(" ").slice(1).join(" ") || "";
-        if (prompt.length == 0) {
-          invalidPromptError("No prompt provided");
-          return;
-        } else {
-          // Create a promise that will be resolved when user confirms/rejects
-          const promptUserConfirmation = (): Promise<boolean> => {
-            return new Promise((resolve) => {
-              confirmationResolverRef.current = resolve;
-              setPendingConfirmation(true);
-              setStatus(3); // awaiting confirmation
-            });
-          };
-
-          await langgraphModify(
-            prompt,
-            neo4j,
-            qdrant,
-            thinkerModel,
-            coderModel,
-            updateOutput,
-            promptUserConfirmation,
-            setPendingChanges
-          );
-          setPendingConfirmation(false);
+        if (query.trim() == "/summarize") {
+          // await summarizeProject(neo4j, qdrant, ollamaStreamQuery);
           setStatus(2);
-        }
-      } else {
-        invalidPromptError("Command not found");
-      }
-    },
-    [model, updateOutput]
-  );
-
-  const ollamaStreamQuery = useCallback(
-    async (payload: any) => {
-      try {
-        if (abortRef.current) {
-          abortRef.current.abort();
-        }
-        abortRef.current = new AbortController();
-
-        let modifiedPayload = payload;
-        // DEFAULTS
-        modifiedPayload.stream = true;
-        if (!payload.model) modifiedPayload.model = model;
-
-        const response = await fetch(`${OLLAMA_URL}/api/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(modifiedPayload),
-          signal: abortRef.current.signal,
-        });
-
-        if (!response.ok || !response.body) {
-          throw new Error(`API error: ${response.statusText}`);
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-
-        // Create a streaming output item
-        const streamTitle = "Ollama Response";
-        updateOutput("log", "", streamTitle);
-        let accumulated = "";
-
-        while (true) {
-          if (abortRef.current?.signal.aborted) {
-            reader.cancel();
+        } else if (query.trim().startsWith("/modify")) {
+          let prompt = query.trim().split(" ").slice(1).join(" ") || "";
+          if (prompt.length == 0) {
+            invalidPromptError("No prompt provided");
             return;
-          }
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          const jsonStrings = chunk.split("\n").filter((s) => s.trim() !== "");
-
-          for (const jsonStr of jsonStrings) {
-            try {
-              const data = JSON.parse(jsonStr);
-              const content = data.message?.content;
-
-              if (content) {
-                accumulated += content;
-                updateOutput("log", accumulated, streamTitle);
-              }
-
-              if (data.done) {
-                let prompt = data?.prompt_eval_count || 0;
-                let completion = data?.eval_count || 0;
-                let total = prompt + completion;
-                setTokenUsage({
-                  total,
-                  prompt,
-                  completion,
-                });
-                break;
-              }
-            } catch (e) {
-              // Ignore malformed JSON chunks
+          } else {
+            if (abortRef.current) {
+              abortRef.current.abort();
             }
+            abortRef.current = new AbortController();
+
+            await langgraphModify(
+              prompt,
+              neo4j,
+              qdrant,
+              thinkerModel,
+              coderModel,
+              updateOutput,
+              promptUserConfirmation,
+              setPendingChanges,
+              abortRef.current.signal
+            );
+            setPendingConfirmation(false);
+            setStatus(2);
           }
+        } else {
+          invalidPromptError("Command not found");
         }
-        setStatus(2);
       } catch (error: any) {
-        if (error.name === "AbortError") {
-          return;
+        if (error.name !== "AbortError") {
+          console.error("[ERROR] ", error);
         }
-        console.error("Failed to stream response:", error);
-        setStatus(2);
       }
     },
     [model, updateOutput]
-  );
-
-  const ollamaReturnQuery = useCallback(
-    async (payload: any) => {
-      try {
-        if (abortRef.current) {
-          abortRef.current.abort();
-        }
-        abortRef.current = new AbortController();
-
-        let modifiedPayload = payload;
-        // DEFAULTS
-        modifiedPayload.stream = false;
-        if (!payload.model) modifiedPayload.model = model;
-
-        const response = await fetch(`${OLLAMA_URL}/api/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(modifiedPayload),
-          signal: abortRef.current.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error(`API error: ${response.statusText}`);
-        }
-
-        const data = (await response.json()) as any;
-        const content = data.message?.content || "";
-        let prompt = data?.prompt_eval_count || 0;
-        let completion = data?.eval_count || 0;
-        let total = prompt + completion;
-        setTokenUsage({
-          total,
-          prompt,
-          completion,
-        });
-        return content;
-      } catch (error: any) {
-        if (error.name === "AbortError") {
-          return;
-        }
-        console.error("Failed to query Ollama:", error);
-        setStatus(2);
-      }
-    },
-    [model]
   );
 
   const invalidPromptError = useCallback(
