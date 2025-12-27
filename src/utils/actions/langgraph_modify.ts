@@ -1,10 +1,14 @@
 import { StateGraph, Annotation, END, START } from "@langchain/langgraph";
-import { ChatOllama } from "@langchain/ollama";
 import { HumanMessage } from "@langchain/core/messages";
 import Neo4jClient from "../neo4jcli";
 import QdrantCli from "../qdrantcli";
 import * as fs from "fs";
 import * as path from "path";
+
+// Prompts
+import ModificationThinkPrompt from "../../types/prompts/modify/Think";
+import ModificationCodeChangesPrompt from "../../types/prompts/modify/CodeChanges";
+import type { ChatOllama } from "@langchain/ollama";
 
 // Define pending changes structure
 export interface PendingChange {
@@ -18,22 +22,19 @@ export interface PendingChange {
 export const applyTargetedChanges = (
   modifications: string,
   repoPath: string,
-  updateOutput?: (type: "log", content: string) => void
+  updateOutput: (type: "log", content: string) => void
 ): PendingChange[] => {
   const pendingChanges: PendingChange[] = [];
-  const log = (msg: string) => {
-    console.log(msg);
-    if (updateOutput) updateOutput("log", msg);
-  };
 
   // Split by "FILE:" regardless of markdown bolding
   const fileBlocks = modifications
     .split(/\bFILE:\s*/i)
     .filter((b) => b.trim().length > 0);
 
-  log(
-    `[applyTargetedChanges] Found ${fileBlocks.length} potential file blocks`
-  );
+  // updateOutput(
+  //   "log",
+  //   `[applyTargetedChanges] Found ${fileBlocks.length} potential file blocks`
+  // );
 
   for (const block of fileBlocks) {
     const blockLines = block.split(/\r?\n/);
@@ -43,10 +44,16 @@ export const applyTargetedChanges = (
       .replace(/^\*+/, "")
       .trim();
 
-    log(`[applyTargetedChanges] Parsed filePath: "${filePath}"`);
+    // updateOutput(
+    //   "log",
+    //   `[applyTargetedChanges] Parsed filePath: "${filePath}"`
+    // );
 
     if (!filePath || (!filePath.includes("/") && !filePath.match(/\.\w+$/))) {
-      log(`[applyTargetedChanges] Skipped invalid filePath: "${filePath}"`);
+      // updateOutput(
+      //   "log",
+      //   `[applyTargetedChanges] Skipped invalid filePath: "${filePath}"`
+      // );
       continue;
     }
 
@@ -56,13 +63,19 @@ export const applyTargetedChanges = (
     }
     const absPath = path.join(repoPath, relativePath);
 
-    log(`[applyTargetedChanges] Resolving: ${filePath} -> ${absPath}`);
+    // updateOutput(
+    //   "log",
+    //   `[applyTargetedChanges] Resolving: ${filePath} -> ${absPath}`
+    // );
 
     let oldContent = "";
     if (fs.existsSync(absPath)) {
       oldContent = fs.readFileSync(absPath, "utf8");
     } else {
-      log(`[applyTargetedChanges] WARNING: File does not exist: ${absPath}`);
+      updateOutput(
+        "log",
+        `[applyTargetedChanges] WARNING: File does not exist: ${absPath}`
+      );
     }
 
     let newContent = oldContent;
@@ -89,7 +102,8 @@ export const applyTargetedChanges = (
       const addMatch = section.match(/ADD:\s*```(?:\w+)?\r?\n([\s\S]*?)```/i);
 
       if (removeMatch || addMatch) {
-        log(
+        updateOutput(
+          "log",
           `[applyTargetedChanges] Found AT LINE ${lineNum}, remove=${!!removeMatch}, add=${!!addMatch}`
         );
         changes.push({
@@ -104,7 +118,8 @@ export const applyTargetedChanges = (
     }
 
     if (changes.length === 0) {
-      log(
+      updateOutput(
+        "log",
         `[applyTargetedChanges] No valid AT LINE changes found for ${filePath}`
       );
     }
@@ -119,7 +134,8 @@ export const applyTargetedChanges = (
 
       if (change.remove) {
         const removeLines = change.remove.split(/\r?\n/);
-        log(
+        updateOutput(
+          "log",
           `[applyTargetedChanges] Attempting removal at line ${change.line} (${removeLines.length} lines)`
         );
 
@@ -128,7 +144,8 @@ export const applyTargetedChanges = (
           const contentLine = contentLines[startIdx + i];
           const removeLine = removeLines[i];
           if (contentLine?.trim() !== removeLine?.trim()) {
-            log(
+            updateOutput(
+              "log",
               `[applyTargetedChanges] Mismatch at line ${
                 startIdx + i + 1
               }: expected "${removeLine?.trim()}", found "${contentLine?.trim()}"`
@@ -140,11 +157,13 @@ export const applyTargetedChanges = (
 
         if (matchFound) {
           contentLines.splice(startIdx, removeLines.length);
-          log(
+          updateOutput(
+            "log",
             `[applyTargetedChanges] Successfully removed ${removeLines.length} lines`
           );
         } else {
-          log(
+          updateOutput(
+            "log",
             `[applyTargetedChanges] FAILED to remove lines at ${change.line} due to mismatch`
           );
         }
@@ -152,7 +171,8 @@ export const applyTargetedChanges = (
 
       if (change.add) {
         const addLines = change.add.split(/\r?\n/);
-        log(
+        updateOutput(
+          "log",
           `[applyTargetedChanges] Adding ${addLines.length} lines at position ${change.line}`
         );
         contentLines.splice(startIdx, 0, ...addLines);
@@ -200,6 +220,8 @@ export default async function langgraphModify(
   query: string,
   neo4j: Neo4jClient,
   qdrant: QdrantCli,
+  thinkerModel: ChatOllama,
+  coderModel: ChatOllama,
   updateOutput: (
     type: "log" | "diff" | "confirmation" | "markdown",
     content: string,
@@ -211,18 +233,6 @@ export default async function langgraphModify(
 ) {
   const repoName = "sample";
   const repoPath = "/Users/mbranni03/Documents/GitHub/FraudeCode/sample";
-
-  const thinkerModel = new ChatOllama({
-    model: "qwen3:8b",
-    baseUrl: "http://localhost:11434",
-    temperature: 0,
-  });
-
-  const coderModel = new ChatOllama({
-    model: "llama3.1:latest",
-    baseUrl: "http://localhost:11434",
-    temperature: 0,
-  });
 
   // Step 1: Search Qdrant for semantic context
   const searchQdrantNode = async (state: typeof AgentState.State) => {
@@ -345,21 +355,11 @@ export default async function langgraphModify(
   const thinkNode = async (state: typeof AgentState.State) => {
     updateOutput("log", "🧠 [THINKING] Analyzing requirements (qwen3:8b)...");
 
-    const prompt = `
-You are an expert software engineer. Your task is to plan how to modify the code in the project based on the user's request.
-Context:
-Structural Context: ${state.structuralContext}
-File Contents: ${state.codeContext}
-
-User Request: "${state.query}"
-
-Instructions:
-1. Analyze which files need to be changed.
-2. Formulate a step-by-step plan for the modifications.
-3. Be precise about what logic needs to be updated.
-
-Output your plan as a detailed technical specification. Begin immediately.
-`;
+    const prompt = ModificationThinkPrompt(
+      state.structuralContext,
+      state.codeContext,
+      state.query
+    );
 
     const promptSize = prompt.length;
     updateOutput("log", `Thinker prompt size: ${promptSize} characters`);
@@ -392,57 +392,11 @@ Output your plan as a detailed technical specification. Begin immediately.
       "💻 [IMPLEMENTATION] Generating code changes (llama3.1:latest)..."
     );
 
-    const prompt = `
-You are an expert software engineer. Your task is to implement ONLY the necessary modifications to the project.
-
-User Request: "${state.query}"
-Plan: ${state.thinkingProcess}
-File Contents: ${state.codeContext}
-
-Instructions:
-1. Provide ONLY the targeted changes needed - do NOT rewrite entire files.
-2. For each file, specify which lines to ADD and which to REMOVE.
-3. Format your response exactly as follows:
-
-FILE: <path/to/file>
-AT LINE <line_number>:
-REMOVE:
-\`\`\`<language>
-<lines to remove - exact content>
-\`\`\`
-ADD:
-\`\`\`<language>
-<lines to add - replacement content>
-\`\`\`
-
-Example for adding a new import and modifying a function:
-
-FILE: sample/utils.py
-AT LINE 1:
-ADD:
-\`\`\`python
-import new_module
-\`\`\`
-
-AT LINE 15:
-REMOVE:
-\`\`\`python
-def old_function():
-    return "old"
-\`\`\`
-ADD:
-\`\`\`python
-def new_function():
-    return "new"
-\`\`\`
-
-IMPORTANT:
-- Only include lines that actually change
-- Keep the REMOVE and ADD blocks as small as possible
-- Include enough context in REMOVE to uniquely identify the location
-- If only adding (no removal), omit the REMOVE block
-- If only removing (no addition), omit the ADD block
-`;
+    const prompt = ModificationCodeChangesPrompt(
+      state.codeContext,
+      state.thinkingProcess,
+      state.query
+    );
 
     const promptSize = prompt.length;
     updateOutput("log", `Coder prompt size: ${promptSize} characters`);

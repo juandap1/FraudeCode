@@ -1,54 +1,14 @@
-import React, { memo } from "react";
 import { Box, Text } from "ink";
 import SelectInput from "ink-select-input";
-import Markdown from "@inkkit/ink-markdown";
-import type { OllamaCLI, OutputItem } from "../utils/ollamacli";
+import type { OllamaCLI } from "../utils/ollamacli";
 import LoaderComponent from "./LoaderComponent";
 import InputBoxComponent from "./InputBoxComponent";
-import DiffViewer from "./output/DiffViewer";
+import OutputRenderer from "./output/OutputRenderer";
 
 type SelectItem = {
   label: string;
   value: boolean;
 };
-
-// OutputRenderer component that renders each output item based on its type
-const OutputRenderer = memo(({ item }: { item: OutputItem }) => {
-  switch (item.type) {
-    case "log":
-      return item.content || item.title ? (
-        <Box flexDirection="column" marginBottom={1}>
-          {item.title && (
-            <Text bold color="cyan">
-              {item.title}:
-            </Text>
-          )}
-          {item.content && <Text>{item.content}</Text>}
-        </Box>
-      ) : null;
-    case "markdown":
-      return (
-        <Box marginLeft={1}>
-          <Markdown>{item.content}</Markdown>
-        </Box>
-      );
-    case "diff":
-      return (
-        <Box flexDirection="column" marginBottom={1}>
-          {item.title && (
-            <Text bold color="yellow">
-              {item.title}:
-            </Text>
-          )}
-          {item.changes && item.changes.length > 0 && (
-            <DiffViewer changes={item.changes} />
-          )}
-        </Box>
-      );
-    default:
-      return null;
-  }
-});
 
 const OllamaClientComponent = ({
   OllamaClient,

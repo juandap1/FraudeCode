@@ -2,20 +2,29 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import summarizeProject from "./actions/summarize_project";
 import Neo4jClient from "./neo4jcli";
 import QdrantCli from "./qdrantcli";
-import modifyProject from "./actions/modify_project";
 import type { PendingChange } from "./actions/langgraph_modify";
 import langgraphModify from "./actions/langgraph_modify";
-import log from "./logger";
+import { ChatOllama } from "@langchain/ollama";
 
 const neo4j = new Neo4jClient();
 const qdrant = new QdrantCli();
-
 // Initialize Qdrant reranker once
 qdrant
   .init()
   .catch((err) => console.error("Failed to initialize Qdrant:", err));
 
 const OLLAMA_URL = "http://localhost:11434";
+const thinkerModel = new ChatOllama({
+  model: "qwen3:8b",
+  baseUrl: OLLAMA_URL,
+  temperature: 0,
+});
+
+const coderModel = new ChatOllama({
+  model: "llama3.1:latest",
+  baseUrl: OLLAMA_URL,
+  temperature: 0,
+});
 
 export type TokenUsage = {
   total: number;
@@ -23,7 +32,12 @@ export type TokenUsage = {
   completion: number;
 };
 
-export type OutputItemType = "log" | "markdown" | "diff" | "confirmation";
+export type OutputItemType =
+  | "log"
+  | "markdown"
+  | "diff"
+  | "confirmation"
+  | "command";
 
 export interface OutputItem {
   id: string;
@@ -111,6 +125,7 @@ export function useOllamaClient(model: string): OllamaCLI {
       setStatus(1);
       itemsRef.current = []; // Clear previous output
       setOutputItems([]);
+      updateOutput("command", query);
 
       if (query.trim() == "/summarize") {
         await summarizeProject(neo4j, qdrant, ollamaStreamQuery);
@@ -134,6 +149,8 @@ export function useOllamaClient(model: string): OllamaCLI {
             prompt,
             neo4j,
             qdrant,
+            thinkerModel,
+            coderModel,
             updateOutput,
             promptUserConfirmation,
             setPendingChanges
