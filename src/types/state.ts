@@ -8,6 +8,7 @@ export interface PendingChange {
 }
 
 export const AgentState = Annotation.Root({
+  id: Annotation<string>(),
   query: Annotation<string>(),
   repoPath: Annotation<string>(),
   repoName: Annotation<string>(),

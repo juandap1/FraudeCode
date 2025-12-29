@@ -93,11 +93,6 @@ export function useOllamaClient(initialId: string | null = null): OllamaCLI {
               thinkerModel,
               coderModel,
               promptUserConfirmation,
-              (changes) => {
-                useFraudeStore
-                  .getState()
-                  .updateInteraction(id, { pendingChanges: changes });
-              },
               signal
             );
             updateInteraction(id, { pendingConfirmation: false, status: 2 });

@@ -13,6 +13,7 @@ import { createThinkNode } from "../nodes/thinkModifications";
 import { createCodeNode } from "../nodes/codeModifications";
 import { createVerifyNode } from "../nodes/verify";
 import { createSaveChangesNode } from "../nodes/saveChanges";
+import { useFraudeStore } from "../../store/useFraudeStore";
 
 export default async function langgraphModify(
   query: string,
@@ -21,7 +22,6 @@ export default async function langgraphModify(
   thinkerModel: ChatOllama,
   coderModel: ChatOllama,
   promptUserConfirmation: () => Promise<boolean>,
-  setPendingChanges: (changes: PendingChange[]) => void,
   signal?: AbortSignal
 ) {
   const repoName = "sample";
@@ -34,7 +34,7 @@ export default async function langgraphModify(
     .addNode("combineContext", createCombineContextNode())
     .addNode("think", createThinkNode(thinkerModel, signal))
     .addNode("code", createCodeNode(coderModel, signal))
-    .addNode("verify", createVerifyNode(setPendingChanges))
+    .addNode("verify", createVerifyNode())
     .addNode("saveChanges", createSaveChangesNode(promptUserConfirmation));
 
   workflow.addEdge(START, "searchQdrant");
@@ -51,6 +51,7 @@ export default async function langgraphModify(
 
   const finalState = (await app.invoke(
     {
+      id: useFraudeStore.getState().currentInteractionId || "",
       query,
       repoName,
       repoPath,
