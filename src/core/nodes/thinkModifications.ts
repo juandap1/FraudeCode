@@ -30,6 +30,7 @@ export const createThinkNode = (
       signal,
     });
     for await (const chunk of stream) {
+      if (signal?.aborted) break;
       const content = chunk.content as string;
       thinkingProcess += content;
       updateOutput("markdown", thinkingProcess, "Implementation Plan");

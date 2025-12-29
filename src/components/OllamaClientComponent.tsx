@@ -1,9 +1,10 @@
 import { Box, Text } from "ink";
 import SelectInput from "ink-select-input";
-import type { OllamaCLI } from "../utils/ollamacli";
+import type { OllamaCLI } from "../hooks/useOllamaClient";
 import LoaderComponent from "./LoaderComponent";
-import InputBoxComponent from "./InputBoxComponent";
 import OutputRenderer from "./output/OutputRenderer";
+import { useInteraction } from "../store/useFraudeStore";
+import InputBoxComponent from "./InputBoxComponent";
 
 type SelectItem = {
   label: string;
@@ -24,14 +25,20 @@ const OllamaClientComponent = ({
     OllamaClient.confirmModification(item.value);
   };
 
+  const interaction = useInteraction(OllamaClient.interactionId);
+
+  if (!interaction) {
+    return null;
+  }
+
   return (
     <Box flexDirection="column">
       {/* Render output items in order */}
-      {OllamaClient.outputItems.map((item) => (
+      {interaction.outputItems.map((item) => (
         <OutputRenderer key={item.id} item={item} />
       ))}
 
-      {OllamaClient.pendingConfirmation && (
+      {interaction.pendingConfirmation && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold color="yellow">
             Do you want to save these changes?
@@ -42,13 +49,14 @@ const OllamaClientComponent = ({
           />
         </Box>
       )}
-      {OllamaClient.status !== 0 && OllamaClient.status !== 3 && (
+
+      {interaction.status !== 0 && interaction.status !== 3 && (
         <LoaderComponent
-          status={OllamaClient.status}
-          tokenUsage={OllamaClient.tokenUsage}
+          status={interaction.status}
+          tokenUsage={interaction.tokenUsage}
         />
       )}
-      {OllamaClient.status === 0 && (
+      {interaction.status === 0 && (
         <InputBoxComponent OllamaClient={OllamaClient} />
       )}
     </Box>

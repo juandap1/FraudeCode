@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
-import type { TokenUsage } from "../utils/ollamacli";
+import type { TokenUsage } from "../store/useFraudeStore";
 
 const LoaderComponent = ({
   status,

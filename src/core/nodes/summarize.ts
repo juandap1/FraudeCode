@@ -36,6 +36,7 @@ export const createSummarizeNode = (
       signal,
     });
     for await (const chunk of stream) {
+      if (signal?.aborted) break;
       const content = chunk.content as string;
       summary += content;
       updateOutput("markdown", summary, "Implementation Details");

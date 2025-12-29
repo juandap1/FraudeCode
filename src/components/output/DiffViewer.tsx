@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
 import * as diff from "diff";
-import type { PendingChange } from "../../utils/actions/langgraph_modify";
+import type { PendingChange } from "../../types/state";
 
 const DiffViewer = ({ changes }: { changes: PendingChange[] }) => {
   console.log(`[DiffViewer] Received ${changes?.length || 0} changes`);

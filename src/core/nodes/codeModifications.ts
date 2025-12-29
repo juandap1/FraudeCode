@@ -32,6 +32,7 @@ export const createCodeNode = (
       signal,
     });
     for await (const chunk of stream) {
+      if (signal?.aborted) break;
       const content = chunk.content as string;
       modifications += content;
       updateOutput("markdown", modifications, "Implementation Details");

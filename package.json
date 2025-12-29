@@ -25,7 +25,8 @@
     "ink-select-input": "^6.2.0",
     "ink-text-input": "^6.0.0",
     "neo4j-driver": "^6.0.1",
-    "web-tree-sitter": "^0.25.10"
+    "web-tree-sitter": "^0.25.10",
+    "zustand": "^5.0.9"
   },
   "scripts": {
     "dev": "bun run src/index.tsx",
