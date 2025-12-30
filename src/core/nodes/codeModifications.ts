@@ -1,15 +1,12 @@
 import { HumanMessage } from "@langchain/core/messages";
-import type { ChatOllama } from "@langchain/ollama";
 import type { AgentStateType } from "../../types/state";
 import ModificationCodeChangesPrompt from "../../types/prompts/modify/CodeChanges";
 import { useFraudeStore } from "../../store/useFraudeStore";
+import { generalModel } from "../../services/llm";
 
 const { updateOutput } = useFraudeStore.getState();
 
-export const createCodeNode = (
-  coderModel: ChatOllama,
-  signal?: AbortSignal
-) => {
+export const createCodeNode = (signal?: AbortSignal) => {
   return async (state: AgentStateType) => {
     updateOutput(
       "log",
@@ -26,7 +23,7 @@ export const createCodeNode = (
     updateOutput("log", `Coder prompt size: ${promptSize} characters`);
 
     let modifications = "";
-    const stream = await coderModel.stream([new HumanMessage(prompt)], {
+    const stream = await generalModel.stream([new HumanMessage(prompt)], {
       signal,
     });
     for await (const chunk of stream) {

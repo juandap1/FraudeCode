@@ -3,7 +3,6 @@ import { useCallback, useRef, useEffect, useState } from "react";
 import qdrant from "../services/qdrant";
 import type { PendingChange } from "../types/state";
 
-import { thinkerModel, coderModel } from "../services/llm";
 import { createModifyProjectTool } from "../core/tools/ModifyProjectTool";
 import { createSummarizeProjectTool } from "../core/tools/SummarizeProjectTool";
 import { createRouterGraph } from "../core/agent/router";
@@ -64,16 +63,11 @@ export function useOllamaClient(initialId: string | null = null): OllamaCLI {
         const signal = abortRef.current.signal;
 
         const tools = [
-          createModifyProjectTool(
-            thinkerModel,
-            coderModel,
-            promptUserConfirmation,
-            signal
-          ),
-          createSummarizeProjectTool(coderModel, signal),
+          createModifyProjectTool(promptUserConfirmation, signal),
+          createSummarizeProjectTool(signal),
         ];
 
-        const router = createRouterGraph(thinkerModel, tools);
+        const router = createRouterGraph(tools);
 
         await router.invoke(
           { messages: [new HumanMessage(query)] },

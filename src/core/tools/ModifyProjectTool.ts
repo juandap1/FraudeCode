@@ -4,8 +4,6 @@ import langgraphModify from "../actions/langgraph_modify";
 import { ChatOllama } from "@langchain/ollama";
 
 export const createModifyProjectTool = (
-  thinkerModel: ChatOllama,
-  coderModel: ChatOllama,
   promptUserConfirmation: () => Promise<boolean>,
   signal?: AbortSignal
 ) => {
@@ -21,13 +19,7 @@ export const createModifyProjectTool = (
         ),
     }),
     func: async ({ request }) => {
-      await langgraphModify(
-        request,
-        thinkerModel,
-        coderModel,
-        promptUserConfirmation,
-        signal
-      );
+      await langgraphModify(request, promptUserConfirmation, signal);
       return "Modification process initiated.";
     },
   });

@@ -1,12 +1,8 @@
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import summarizeProject from "../actions/summarize_project";
-import { ChatOllama } from "@langchain/ollama";
 
-export const createSummarizeProjectTool = (
-  coderModel: ChatOllama,
-  signal?: AbortSignal
-) => {
+export const createSummarizeProjectTool = (signal?: AbortSignal) => {
   return new DynamicStructuredTool({
     name: "summarize_project",
     description:
@@ -24,7 +20,7 @@ export const createSummarizeProjectTool = (
       // Looking at `summarizeProject.ts`, it takes `coderModel` and `signal`.
       // The query is hardcoded in `summarizeProject.ts` but we can refactor later if needed.
       // For now, we just call the function.
-      await summarizeProject(coderModel, signal);
+      await summarizeProject(signal);
       return "Summary generation initiated.";
     },
   });

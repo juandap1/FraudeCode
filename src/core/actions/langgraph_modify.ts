@@ -1,5 +1,4 @@
 import { StateGraph, END, START } from "@langchain/langgraph";
-import type { ChatOllama } from "@langchain/ollama";
 import { AgentState, type PendingChange } from "../../types/state";
 
 // Nodes
@@ -15,8 +14,6 @@ import { useFraudeStore } from "../../store/useFraudeStore";
 
 export default async function langgraphModify(
   query: string,
-  thinkerModel: ChatOllama,
-  coderModel: ChatOllama,
   promptUserConfirmation: () => Promise<boolean>,
   signal?: AbortSignal
 ) {
@@ -28,8 +25,8 @@ export default async function langgraphModify(
     .addNode("searchNeo4j", createSearchNeo4jNode())
     .addNode("gatherFiles", createGatherFilesNode())
     .addNode("combineContext", createCombineContextNode())
-    .addNode("think", createThinkNode(thinkerModel, signal))
-    .addNode("code", createCodeNode(coderModel, signal))
+    .addNode("think", createThinkNode(signal))
+    .addNode("code", createCodeNode(signal))
     .addNode("verify", createVerifyNode())
     .addNode("saveChanges", createSaveChangesNode(promptUserConfirmation));
 

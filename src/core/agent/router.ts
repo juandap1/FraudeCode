@@ -5,18 +5,15 @@ import {
   AIMessage,
 } from "@langchain/core/messages";
 import { type DynamicStructuredTool } from "@langchain/core/tools";
-import { ChatOllama } from "@langchain/ollama";
+import { generalModel } from "../../services/llm";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 
 interface RouterState {
   messages: BaseMessage[];
 }
 
-export const createRouterGraph = (
-  model: ChatOllama,
-  tools: DynamicStructuredTool[]
-) => {
-  const modelWithTools = model.bindTools(tools);
+export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
+  const modelWithTools = generalModel.bindTools(tools);
 
   const toolNode = new ToolNode<RouterState>(tools);
 

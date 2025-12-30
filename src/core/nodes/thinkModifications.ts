@@ -1,15 +1,12 @@
 import { HumanMessage } from "@langchain/core/messages";
-import type { ChatOllama } from "@langchain/ollama";
 import type { AgentStateType } from "../../types/state";
 import ModificationThinkPrompt from "../../types/prompts/modify/Think";
 import { useFraudeStore } from "../../store/useFraudeStore";
+import { thinkerModel } from "../../services/llm";
 
 const { updateOutput } = useFraudeStore.getState();
 
-export const createThinkNode = (
-  thinkerModel: ChatOllama,
-  signal?: AbortSignal
-) => {
+export const createThinkNode = (signal?: AbortSignal) => {
   return async (state: AgentStateType) => {
     updateOutput("log", "🧠 [THINKING] Analyzing requirements (qwen3:8b)...");
 
