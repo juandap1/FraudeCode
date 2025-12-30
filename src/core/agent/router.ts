@@ -3,6 +3,7 @@ import {
   type BaseMessage,
   AIMessage,
   SystemMessage,
+  ToolMessage,
 } from "@langchain/core/messages";
 import { type DynamicStructuredTool } from "@langchain/core/tools";
 import { generalModel, scoutModel } from "../../services/llm";
@@ -16,14 +17,6 @@ interface RouterState {
 
 const { setStatus } = useFraudeStore.getState();
 
-// const SYSTEM_PROMPT = `You are a helpful coding assistant.
-// Your goal is to help the user with their codebase.
-// You have access to tools that can summarize the project or modify it.
-
-// - If the user asks for something about the project and it aligns with a tool's description, use that tool.
-// - Otherwise, just respond naturally about the project.
-// `;
-
 export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
   const modelWithTools = generalModel.bindTools(tools);
 
@@ -32,40 +25,47 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
   const classifyIntent = async (state: RouterState) => {
     setStatus("Analyzing request");
     const lastMessage = state.messages[state.messages.length - 1];
-    log("Last message: ", lastMessage);
     if (!lastMessage) return "general";
 
     const response = await scoutModel.invoke([
       new SystemMessage(
-        "Classify the user query into 'project' if it's about coding, files, or project structure, or 'general' if it's unrelated conversation. IMPORTANT: Respond with exactly one word: 'project' or 'general'."
+        "Classify the user query into 'project' if it's related to the current codebase, project structure, coding questions, or requested actions. Classify as 'general' ONLY if it's completely unrelated conversation (greetings, off-topic questions, etc.). IMPORTANT: Respond with exactly one word: 'project' or 'general'."
       ),
       lastMessage,
     ]);
     const decision = response.content.toString().toLowerCase().trim();
-    log("Decision: ", decision);
-    return decision.includes("project") ? "agent" : "general";
+    log("Scout Decision: ", decision);
+    return decision.includes("project") ? "project" : "general";
   };
 
   const callModel = async (state: RouterState, config?: any) => {
     setStatus("Thinking");
-    const { messages } = state;
-    let fullResponse: any = null;
-    const stream = await modelWithTools.stream(messages, {
+    const messages = state.messages;
+    log("CallModel messages count: ", messages.length);
+
+    const response = await modelWithTools.invoke(messages, {
       signal: config?.signal,
     });
 
-    for await (const chunk of stream) {
-      fullResponse = fullResponse ? fullResponse.concat(chunk) : chunk;
-      if (
-        fullResponse.content &&
-        (!chunk.tool_call_chunks || chunk.tool_call_chunks.length === 0)
-      ) {
-        useFraudeStore
-          .getState()
-          .updateOutput("markdown", fullResponse.content.toString());
-      }
+    if (
+      response.content &&
+      (!response.tool_calls || response.tool_calls.length === 0)
+    ) {
+      useFraudeStore
+        .getState()
+        .updateOutput("markdown", response.content.toString());
     }
-    return { messages: [fullResponse] };
+
+    if (response.tool_calls && response.tool_calls.length > 0) {
+      log(
+        "Tool calls detected: ",
+        JSON.stringify(response.tool_calls, null, 2)
+      );
+    } else {
+      log("No tool calls detected in project response.");
+    }
+
+    return { messages: [response] };
   };
 
   const callGeneralModel = async (state: RouterState, config?: any) => {
@@ -90,13 +90,25 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
   const shouldContinue = (state: RouterState) => {
     const { messages } = state;
     const lastMessage = messages[messages.length - 1];
+    if (!lastMessage) return END;
+
+    log(
+      "Checking if should continue. Last message type: ",
+      lastMessage.constructor.name
+    );
+
     if (
-      lastMessage instanceof AIMessage &&
-      lastMessage.tool_calls &&
-      lastMessage.tool_calls.length > 0
+      (lastMessage instanceof AIMessage || "tool_calls" in lastMessage) &&
+      Array.isArray((lastMessage as any).tool_calls) &&
+      (lastMessage as any).tool_calls.length > 0
     ) {
+      log(
+        "Continuing to tools. Call: ",
+        (lastMessage as any).tool_calls[0]?.name
+      );
       return "tools";
     }
+    log("Ending project flow.");
     return END;
   };
 
@@ -108,15 +120,36 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
       },
     },
   })
-    .addNode("agent", callModel)
+    .addNode("project", callModel)
     .addNode("general", callGeneralModel)
     .addNode("tools", toolNode)
     .addConditionalEdges(START, classifyIntent, {
-      agent: "agent",
+      project: "project",
       general: "general",
     })
-    .addConditionalEdges("agent", shouldContinue)
-    .addEdge("tools", "agent") // Loop back to agent after tools to let it summarize/thank
+    .addConditionalEdges("project", shouldContinue, {
+      tools: "tools",
+      [END]: END,
+    })
+    .addConditionalEdges(
+      "tools",
+      (state: RouterState) => {
+        const lastMessage = state.messages[state.messages.length - 1];
+        if (
+          lastMessage instanceof ToolMessage &&
+          (lastMessage.content.toString().includes("User rejected") ||
+            lastMessage.content.toString().includes("successfully applied"))
+        ) {
+          log("Modifications finalized, ending session early.");
+          return END;
+        }
+        return "project";
+      },
+      {
+        project: "project",
+        [END]: END,
+      }
+    )
     .addEdge("general", END);
 
   return workflow.compile();

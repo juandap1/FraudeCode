@@ -24,27 +24,15 @@ export interface OllamaCLI {
 
 export function useOllamaClient(initialId: string | null = null): OllamaCLI {
   const [interactionId, setInteractionId] = useState<string | null>(initialId);
-  const confirmationResolverRef = useRef<((confirmed: boolean) => void) | null>(
-    null
-  );
-
-  const { addInteraction, updateInteraction, updateOutput } = useFraudeStore();
+  const {
+    addInteraction,
+    updateInteraction,
+    updateOutput,
+    promptUserConfirmation,
+    resolveConfirmation,
+  } = useFraudeStore();
 
   const interaction = useInteraction(interactionId);
-
-  const promptUserConfirmation = (): Promise<boolean> => {
-    return new Promise((resolve) => {
-      if (!interactionId) {
-        resolve(false);
-        return;
-      }
-      confirmationResolverRef.current = resolve;
-      updateInteraction(interactionId, {
-        pendingConfirmation: true,
-        status: 3,
-      });
-    });
-  };
 
   const handleQuery = useCallback(
     async (query: string) => {
@@ -86,15 +74,9 @@ export function useOllamaClient(initialId: string | null = null): OllamaCLI {
 
   const confirmModification = useCallback(
     (confirmed: boolean) => {
-      if (confirmationResolverRef.current) {
-        confirmationResolverRef.current(confirmed);
-        confirmationResolverRef.current = null;
-        if (interactionId) {
-          updateInteraction(interactionId, { pendingConfirmation: false });
-        }
-      }
+      resolveConfirmation(confirmed, interactionId || undefined);
     },
-    [interactionId, updateInteraction]
+    [interactionId, resolveConfirmation]
   );
 
   return {

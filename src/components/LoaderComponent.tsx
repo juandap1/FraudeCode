@@ -52,6 +52,11 @@ const LoaderComponent = ({
           Finished ({(elapsed / 10).toFixed(1)}s ※ {tokenUsage.total} tokens)
         </Text>
       )}
+      {status === 3 && (
+        <Text color="yellow">
+          ▶ Awaiting user confirmation... ({(elapsed / 10).toFixed(1)}s)
+        </Text>
+      )}
       {status === -1 && (
         <Text dimColor>Interrupted ({(elapsed / 10).toFixed(1)}s)</Text>
       )}

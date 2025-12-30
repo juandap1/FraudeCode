@@ -48,9 +48,9 @@ def new_function():
 
 IMPORTANT:
 - Only include lines that actually change
-- Keep the REMOVE and ADD blocks as small as possible
+- Use ONE block per logical change (e.g., adding an entire function should be one block, not multiple AT LINE instructions)
 - Include enough context in REMOVE to uniquely identify the location
-- If only adding (no removal), omit the REMOVE block
+- If only adding (no removal), specify the line number where the addition should start
 - If only removing (no addition), omit the ADD block
 `;
 

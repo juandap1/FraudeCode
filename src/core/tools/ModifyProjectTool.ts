@@ -18,8 +18,16 @@ export const createModifyProjectTool = (
         ),
     }),
     func: async ({ request }) => {
-      await langgraphModify(request, promptUserConfirmation, getSignal());
-      return "Modification process initiated.";
+      const result = await langgraphModify(
+        request,
+        promptUserConfirmation,
+        getSignal()
+      );
+      if (result.userConfirmed) {
+        return "Modifications were successfully applied to the project.";
+      } else {
+        return "User rejected the proposed changes. No modifications were made.";
+      }
     },
   });
 };
