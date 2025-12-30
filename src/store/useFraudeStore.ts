@@ -39,6 +39,7 @@ interface FraudeStore {
   interactionOrder: string[];
   currentInteractionId: string | null;
   abortController: AbortController | null;
+  history: string[];
   // Actions
   addInteraction: () => string;
   updateInteraction: (id: string, updates: Partial<InteractionState>) => void;
@@ -54,6 +55,7 @@ interface FraudeStore {
   setCurrentInteraction: (id: string | null) => void;
   promptUserConfirmation: (id?: string) => Promise<boolean>;
   resolveConfirmation: (confirmed: boolean, id?: string) => void;
+  addToHistory: (query: string) => void;
 }
 
 export const useFraudeStore = create<FraudeStore>((set) => ({
@@ -62,6 +64,7 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
   interactionOrder: [],
   currentInteractionId: null,
   abortController: null,
+  history: [],
   addInteraction: () => {
     const id = crypto.randomUUID();
     const newInteraction: InteractionState = {
@@ -214,6 +217,17 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
         };
       });
     }
+  },
+
+  addToHistory: (query) => {
+    if (!query.trim()) return;
+    set((state) => {
+      const newHistory = [
+        query,
+        ...state.history.filter((item) => item !== query),
+      ].slice(0, 50);
+      return { history: newHistory };
+    });
   },
 }));
 
