@@ -4,10 +4,10 @@ import summarizePrompt from "../../types/prompts/Summarize";
 import { useFraudeStore } from "../../store/useFraudeStore";
 import { generalModel } from "../../services/llm";
 
-const { updateOutput } = useFraudeStore.getState();
+const { updateOutput, setStatus } = useFraudeStore.getState();
 export const createSummarizeNode = () => {
   return async (state: AgentStateType, config?: any) => {
-    updateOutput("log", "Generating summary (llama3.1:latest)...");
+    setStatus("Generating summary (llama3.1:latest)");
 
     let codeContext = "";
     if (state.qdrantResults && state.qdrantResults.length > 0) {
@@ -38,7 +38,7 @@ export const createSummarizeNode = () => {
       updateOutput("markdown", summary, "Implementation Details");
     }
 
-    updateOutput("log", "Implementation complete.");
+    // setStatus("Implementation complete.");
 
     return {
       summary,

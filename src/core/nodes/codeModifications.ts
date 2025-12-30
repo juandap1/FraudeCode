@@ -4,14 +4,11 @@ import ModificationCodeChangesPrompt from "../../types/prompts/modify/CodeChange
 import { useFraudeStore } from "../../store/useFraudeStore";
 import { generalModel } from "../../services/llm";
 
-const { updateOutput } = useFraudeStore.getState();
+const { updateOutput, setStatus } = useFraudeStore.getState();
 
 export const createCodeNode = () => {
   return async (state: AgentStateType, config?: any) => {
-    updateOutput(
-      "log",
-      "💻 [IMPLEMENTATION] Generating code changes (llama3.1:latest)..."
-    );
+    setStatus("Generating code changes (llama3.1:latest)");
 
     const prompt = ModificationCodeChangesPrompt(
       state.codeContext,
@@ -34,7 +31,7 @@ export const createCodeNode = () => {
       updateOutput("markdown", modifications, "Implementation Details");
     }
 
-    updateOutput("log", "Implementation complete.");
+    // setStatus("Implementation complete.");
 
     return {
       modifications,

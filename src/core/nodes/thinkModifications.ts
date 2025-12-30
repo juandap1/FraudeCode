@@ -4,11 +4,11 @@ import ModificationThinkPrompt from "../../types/prompts/modify/Think";
 import { useFraudeStore } from "../../store/useFraudeStore";
 import { thinkerModel } from "../../services/llm";
 
-const { updateOutput } = useFraudeStore.getState();
+const { updateOutput, setStatus } = useFraudeStore.getState();
 
 export const createThinkNode = () => {
   return async (state: AgentStateType, config?: any) => {
-    updateOutput("log", "🧠 [THINKING] Analyzing requirements (qwen3:8b)...");
+    setStatus("Analyzing requirements (qwen3:8b)");
 
     const prompt = ModificationThinkPrompt(
       state.structuralContext,
@@ -31,8 +31,6 @@ export const createThinkNode = () => {
       thinkingProcess += content;
       updateOutput("markdown", thinkingProcess, "Implementation Plan");
     }
-
-    updateOutput("log", "Planning complete.");
 
     return {
       thinkingProcess,

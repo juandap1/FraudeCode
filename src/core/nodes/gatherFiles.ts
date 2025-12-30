@@ -3,18 +3,18 @@ import * as path from "path";
 import type { AgentStateType } from "../../types/state";
 import { useFraudeStore } from "../../store/useFraudeStore";
 
-const { updateOutput } = useFraudeStore.getState();
+const { updateOutput, setStatus } = useFraudeStore.getState();
 
 export const createGatherFilesNode = () => {
   return async (state: AgentStateType) => {
-    updateOutput("log", "📄 [STEP 3/4] Reading file contents...");
+    setStatus("Reading file contents");
 
     const fileContents: Record<string, string> = {};
 
     for (const filePath of state.filePaths || []) {
       const absPath = path.join(state.repoPath, "..", filePath);
       if (fs.existsSync(absPath)) {
-        updateOutput("log", `Reading: ${filePath}`);
+        setStatus(`Reading: ${filePath}`);
         fileContents[filePath] = fs.readFileSync(absPath, "utf8");
       }
     }

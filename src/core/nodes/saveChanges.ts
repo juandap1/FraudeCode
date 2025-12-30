@@ -7,7 +7,7 @@ export const createSaveChangesNode = (
   promptUserConfirmation: () => Promise<boolean>
 ) => {
   return async (state: AgentStateType) => {
-    updateOutput("log", "💾 [SAVE] Waiting for user confirmation...");
+    updateOutput("log", "Waiting for user confirmation");
 
     const confirmed = await promptUserConfirmation();
 

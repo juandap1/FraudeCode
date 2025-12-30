@@ -30,6 +30,7 @@ export interface InteractionState {
   elapsedTime: number;
   pendingConfirmation: boolean;
   pendingChanges: PendingChange[];
+  statusText?: string;
 }
 
 interface FraudeStore {
@@ -48,6 +49,7 @@ interface FraudeStore {
     changes?: PendingChange[],
     id?: string
   ) => void;
+  setStatus: (statusText: string | undefined, id?: string) => void;
   setCurrentInteraction: (id: string | null) => void;
 }
 
@@ -67,6 +69,7 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
       elapsedTime: 0,
       pendingConfirmation: false,
       pendingChanges: [],
+      statusText: undefined,
     };
     set((state) => ({
       interactions: { ...state.interactions, [id]: newInteraction },
@@ -118,6 +121,23 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
           [interactionId]: {
             ...interaction,
             outputItems,
+          },
+        },
+      };
+    });
+  },
+  setStatus: (statusText, id) => {
+    set((state) => {
+      const interactionId = id || state.currentInteractionId;
+      if (!interactionId) return state;
+      const interaction = state.interactions[interactionId];
+      if (!interaction) return state;
+      return {
+        interactions: {
+          ...state.interactions,
+          [interactionId]: {
+            ...interaction,
+            statusText,
           },
         },
       };

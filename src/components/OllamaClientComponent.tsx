@@ -54,6 +54,7 @@ const OllamaClientComponent = ({
         <LoaderComponent
           status={interaction.status}
           tokenUsage={interaction.tokenUsage}
+          statusText={interaction.statusText}
         />
       )}
       {interaction.status === 0 && (
