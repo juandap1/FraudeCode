@@ -1,11 +1,9 @@
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import langgraphModify from "../actions/langgraph_modify";
-import { ChatOllama } from "@langchain/ollama";
 
 export const createModifyProjectTool = (
-  promptUserConfirmation: () => Promise<boolean>,
-  signal?: AbortSignal
+  promptUserConfirmation: () => Promise<boolean>
 ) => {
   return new DynamicStructuredTool({
     name: "modify_project",
@@ -19,7 +17,7 @@ export const createModifyProjectTool = (
         ),
     }),
     func: async ({ request }) => {
-      await langgraphModify(request, promptUserConfirmation, signal);
+      await langgraphModify(request, promptUserConfirmation);
       return "Modification process initiated.";
     },
   });

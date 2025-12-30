@@ -2,7 +2,7 @@ import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import summarizeProject from "../actions/summarize_project";
 
-export const createSummarizeProjectTool = (signal?: AbortSignal) => {
+export const createSummarizeProjectTool = () => {
   return new DynamicStructuredTool({
     name: "summarize_project",
     description:
@@ -15,12 +15,7 @@ export const createSummarizeProjectTool = (signal?: AbortSignal) => {
         ),
     }),
     func: async ({ query }) => {
-      // The underlying action currently ignores the query argument in favor of a hardcoded one or one passed in state,
-      // but let's pass it through if possible or just trigger the action.
-      // Looking at `summarizeProject.ts`, it takes `coderModel` and `signal`.
-      // The query is hardcoded in `summarizeProject.ts` but we can refactor later if needed.
-      // For now, we just call the function.
-      await summarizeProject(signal);
+      await summarizeProject();
       return "Summary generation initiated.";
     },
   });

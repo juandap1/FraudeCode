@@ -37,6 +37,7 @@ interface FraudeStore {
   interactions: Record<string, InteractionState>;
   interactionOrder: string[];
   currentInteractionId: string | null;
+  abortController: AbortController | null;
   // Actions
   addInteraction: () => string;
   updateInteraction: (id: string, updates: Partial<InteractionState>) => void;
@@ -55,7 +56,7 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
   interactions: {},
   interactionOrder: [],
   currentInteractionId: null,
-
+  abortController: null,
   addInteraction: () => {
     const id = crypto.randomUUID();
     const newInteraction: InteractionState = {
@@ -137,4 +138,22 @@ export const useInteraction = (id: string | null) => {
       (state) => state.interactions[state.interactionOrder.length - 1]
     );
   return useFraudeStore((state) => (id ? state.interactions[id] : undefined));
+};
+
+export const initSignal = () => {
+  let existing = useFraudeStore.getState().abortController;
+  if (existing) {
+    existing.abort();
+  }
+  useFraudeStore.setState({ abortController: new AbortController() });
+};
+
+export const interrupt = () => {
+  useFraudeStore.getState().abortController?.abort();
+  useFraudeStore.setState({ abortController: null });
+  const interactionId = useFraudeStore.getState().currentInteractionId;
+  if (!interactionId) return;
+  useFraudeStore.getState().updateInteraction(interactionId, {
+    status: -1,
+  });
 };

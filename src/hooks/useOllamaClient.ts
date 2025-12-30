@@ -1,18 +1,20 @@
 import { useCallback, useRef, useState } from "react";
 
-import qdrant from "../services/qdrant";
 import type { PendingChange } from "../types/state";
 
 import { createModifyProjectTool } from "../core/tools/ModifyProjectTool";
 import { createSummarizeProjectTool } from "../core/tools/SummarizeProjectTool";
 import { createRouterGraph } from "../core/agent/router";
 import { HumanMessage } from "@langchain/core/messages";
-import { useFraudeStore, useInteraction } from "../store/useFraudeStore";
+import {
+  useFraudeStore,
+  useInteraction,
+  initSignal,
+} from "../store/useFraudeStore";
 import log from "../utils/logger";
 
 export interface OllamaCLI {
   handleQuery: (query: string) => Promise<void>;
-  interrupt: () => void;
   confirmModification: (confirmed: boolean) => void;
   pendingConfirmation: boolean;
   pendingChanges: PendingChange[];
@@ -21,7 +23,6 @@ export interface OllamaCLI {
 
 export function useOllamaClient(initialId: string | null = null): OllamaCLI {
   const [interactionId, setInteractionId] = useState<string | null>(initialId);
-  const abortRef = useRef<AbortController | null>(null);
   const confirmationResolverRef = useRef<((confirmed: boolean) => void) | null>(
     null
   );
@@ -55,15 +56,11 @@ export function useOllamaClient(initialId: string | null = null): OllamaCLI {
 
         updateInteraction(id, { status: 1 });
 
-        if (abortRef.current) {
-          abortRef.current.abort();
-        }
-        abortRef.current = new AbortController();
-        const signal = abortRef.current.signal;
+        initSignal();
 
         const tools = [
-          createModifyProjectTool(promptUserConfirmation, signal),
-          createSummarizeProjectTool(signal),
+          createModifyProjectTool(promptUserConfirmation),
+          createSummarizeProjectTool(),
         ];
 
         const router = createRouterGraph(tools);
@@ -83,16 +80,6 @@ export function useOllamaClient(initialId: string | null = null): OllamaCLI {
     [addInteraction, updateInteraction]
   );
 
-  const interrupt = useCallback(() => {
-    if (abortRef.current) {
-      abortRef.current.abort();
-      abortRef.current = null;
-    }
-    if (interactionId) {
-      updateInteraction(interactionId, { status: -1 });
-    }
-  }, [interactionId, updateInteraction]);
-
   const confirmModification = useCallback(
     (confirmed: boolean) => {
       if (confirmationResolverRef.current) {
@@ -108,7 +95,6 @@ export function useOllamaClient(initialId: string | null = null): OllamaCLI {
 
   return {
     handleQuery,
-    interrupt,
     confirmModification,
     pendingConfirmation: interaction?.pendingConfirmation || false,
     pendingChanges: interaction?.pendingChanges || [],

@@ -14,8 +14,7 @@ import { useFraudeStore } from "../../store/useFraudeStore";
 
 export default async function langgraphModify(
   query: string,
-  promptUserConfirmation: () => Promise<boolean>,
-  signal?: AbortSignal
+  promptUserConfirmation: () => Promise<boolean>
 ) {
   const repoName = "sample";
   const repoPath = "/Users/mbranni03/Documents/GitHub/FraudeCode/sample";
@@ -25,8 +24,8 @@ export default async function langgraphModify(
     .addNode("searchNeo4j", createSearchNeo4jNode())
     .addNode("gatherFiles", createGatherFilesNode())
     .addNode("combineContext", createCombineContextNode())
-    .addNode("think", createThinkNode(signal))
-    .addNode("code", createCodeNode(signal))
+    .addNode("think", createThinkNode())
+    .addNode("code", createCodeNode())
     .addNode("verify", createVerifyNode())
     .addNode("saveChanges", createSaveChangesNode(promptUserConfirmation));
 
@@ -42,19 +41,16 @@ export default async function langgraphModify(
 
   const app = workflow.compile();
 
-  const finalState = (await app.invoke(
-    {
-      id: useFraudeStore.getState().currentInteractionId || "",
-      query,
-      repoName,
-      repoPath,
-      status: "started",
-      pendingChanges: [],
-      userConfirmed: false,
-      llmContext: { thinkerPromptSize: 0, coderPromptSize: 0 },
-    },
-    { signal }
-  )) as any;
+  const finalState = (await app.invoke({
+    id: useFraudeStore.getState().currentInteractionId || "",
+    query,
+    repoName,
+    repoPath,
+    status: "started",
+    pendingChanges: [],
+    userConfirmed: false,
+    llmContext: { thinkerPromptSize: 0, coderPromptSize: 0 },
+  })) as any;
 
   return {
     diffs: finalState.diffs,
