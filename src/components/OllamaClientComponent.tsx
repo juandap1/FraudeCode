@@ -50,10 +50,11 @@ const OllamaClientComponent = ({
         </Box>
       )}
 
-      {interaction.status !== 0 && interaction.status !== 3 && (
+      {interaction.status !== 0 && (
         <LoaderComponent
           status={interaction.status}
           tokenUsage={interaction.tokenUsage}
+          statusText={interaction.statusText}
         />
       )}
       {interaction.status === 0 && (

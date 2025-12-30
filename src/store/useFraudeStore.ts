@@ -30,6 +30,7 @@ export interface InteractionState {
   elapsedTime: number;
   pendingConfirmation: boolean;
   pendingChanges: PendingChange[];
+  statusText?: string;
 }
 
 interface FraudeStore {
@@ -37,9 +38,11 @@ interface FraudeStore {
   interactions: Record<string, InteractionState>;
   interactionOrder: string[];
   currentInteractionId: string | null;
+  abortController: AbortController | null;
   // Actions
   addInteraction: () => string;
   updateInteraction: (id: string, updates: Partial<InteractionState>) => void;
+  updateTokenUsage: (usage: TokenUsage, id?: string) => void;
   updateOutput: (
     type: OutputItemType,
     content: string,
@@ -47,7 +50,10 @@ interface FraudeStore {
     changes?: PendingChange[],
     id?: string
   ) => void;
+  setStatus: (statusText: string | undefined, id?: string) => void;
   setCurrentInteraction: (id: string | null) => void;
+  promptUserConfirmation: (id?: string) => Promise<boolean>;
+  resolveConfirmation: (confirmed: boolean, id?: string) => void;
 }
 
 export const useFraudeStore = create<FraudeStore>((set) => ({
@@ -55,7 +61,7 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
   interactions: {},
   interactionOrder: [],
   currentInteractionId: null,
-
+  abortController: null,
   addInteraction: () => {
     const id = crypto.randomUUID();
     const newInteraction: InteractionState = {
@@ -66,6 +72,7 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
       elapsedTime: 0,
       pendingConfirmation: false,
       pendingChanges: [],
+      statusText: undefined,
     };
     set((state) => ({
       interactions: { ...state.interactions, [id]: newInteraction },
@@ -83,6 +90,27 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
         interactions: {
           ...state.interactions,
           [id]: { ...interaction, ...updates },
+        },
+      };
+    });
+  },
+  updateTokenUsage: (usage: TokenUsage, id?: string) => {
+    set((state) => {
+      const interactionId = id || state.currentInteractionId;
+      if (!interactionId) return state;
+      const interaction = state.interactions[interactionId];
+      if (!interaction) return state;
+      let currentUsage = interaction.tokenUsage;
+      currentUsage.total += usage.total;
+      currentUsage.prompt += usage.prompt;
+      currentUsage.completion += usage.completion;
+      return {
+        interactions: {
+          ...state.interactions,
+          [interactionId]: {
+            ...interaction,
+            tokenUsage: currentUsage,
+          },
         },
       };
     });
@@ -122,9 +150,74 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
       };
     });
   },
+  setStatus: (statusText, id) => {
+    set((state) => {
+      const interactionId = id || state.currentInteractionId;
+      if (!interactionId) return state;
+      const interaction = state.interactions[interactionId];
+      if (!interaction) return state;
+      return {
+        interactions: {
+          ...state.interactions,
+          [interactionId]: {
+            ...interaction,
+            statusText,
+          },
+        },
+      };
+    });
+  },
 
   setCurrentInteraction: (id) => set({ currentInteractionId: id }),
+
+  promptUserConfirmation: (id) => {
+    return new Promise((resolve) => {
+      const interactionId =
+        id || useFraudeStore.getState().currentInteractionId;
+      if (!interactionId) {
+        resolve(false);
+        return;
+      }
+      confirmationResolver = resolve;
+      set((state) => {
+        const interaction = state.interactions[interactionId];
+        if (!interaction) return state;
+        return {
+          interactions: {
+            ...state.interactions,
+            [interactionId]: {
+              ...interaction,
+              pendingConfirmation: true,
+              status: 3,
+            },
+          },
+        };
+      });
+    });
+  },
+
+  resolveConfirmation: (confirmed, id) => {
+    const interactionId = id || useFraudeStore.getState().currentInteractionId;
+    if (confirmationResolver) {
+      confirmationResolver(confirmed);
+      confirmationResolver = null;
+    }
+    if (interactionId) {
+      set((state) => {
+        const interaction = state.interactions[interactionId];
+        if (!interaction) return state;
+        return {
+          interactions: {
+            ...state.interactions,
+            [interactionId]: { ...interaction, pendingConfirmation: false },
+          },
+        };
+      });
+    }
+  },
 }));
+
+let confirmationResolver: ((confirmed: boolean) => void) | null = null;
 
 export const getInteraction = (id: string | null) => {
   if (!id) return undefined;
@@ -138,3 +231,28 @@ export const useInteraction = (id: string | null) => {
     );
   return useFraudeStore((state) => (id ? state.interactions[id] : undefined));
 };
+
+export const initSignal = () => {
+  let existing = useFraudeStore.getState().abortController;
+  if (existing) {
+    existing.abort();
+  }
+  useFraudeStore.setState({ abortController: new AbortController() });
+};
+
+export const interrupt = () => {
+  const state = useFraudeStore.getState();
+  if (state.abortController) {
+    state.abortController.abort();
+  }
+
+  const interactionId = state.currentInteractionId;
+  if (interactionId) {
+    state.updateInteraction(interactionId, {
+      status: -1,
+    });
+  }
+};
+
+export const getSignal = () =>
+  useFraudeStore.getState().abortController?.signal;

@@ -1,9 +1,13 @@
 import IntroComponent from "./IntroComponent";
 import { Box, useInput } from "ink";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import useOllamaClient from "../hooks/useOllamaClient";
 import OllamaClientComponent from "./OllamaClientComponent";
-import { useFraudeStore, useInteraction } from "../store/useFraudeStore";
+import {
+  useFraudeStore,
+  useInteraction,
+  interrupt,
+} from "../store/useFraudeStore";
 import log from "../utils/logger";
 
 const Session = ({
@@ -17,12 +21,6 @@ const Session = ({
 }) => {
   const OllamaClient = useOllamaClient(interactionId);
   const interaction = useInteraction(interactionId);
-
-  useInput((input, key) => {
-    if (isLast && (key.escape || input === "\u001b")) {
-      OllamaClient.interrupt();
-    }
-  });
 
   useEffect(() => {
     if (isLast && (interaction?.status === 2 || interaction?.status === -1)) {
@@ -47,6 +45,8 @@ export default function App() {
       useFraudeStore.setState({ started: true });
       useFraudeStore.getState().addInteraction();
       log("App Started...");
+    } else if (key.escape || input === "\u001b") {
+      interrupt();
     }
   });
 

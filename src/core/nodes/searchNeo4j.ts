@@ -2,20 +2,17 @@ import type { AgentStateType } from "../../types/state";
 import { useFraudeStore } from "../../store/useFraudeStore";
 import neo4jClient from "../../services/neo4j";
 
-const { updateOutput } = useFraudeStore.getState();
+const { updateOutput, setStatus } = useFraudeStore.getState();
 export const createSearchNeo4jNode = () => {
   return async (state: AgentStateType) => {
-    updateOutput(
-      "log",
-      "🧬 [STEP 2/4] Searching Neo4j for structural context..."
-    );
+    setStatus("Searching Neo4j for structural context");
 
     const words = state.query.split(/\W+/);
     let structuralContext = "";
 
     for (const word of words) {
       if (word.length < 3) continue;
-      updateOutput("log", `Inspecting symbol: "${word}"...`);
+      setStatus(`Inspecting symbol: "${word}"`);
       const symContext = await neo4jClient.getContextBySymbol(word);
       if (symContext.length > 0) {
         structuralContext +=

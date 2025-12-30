@@ -1,16 +1,13 @@
 import { HumanMessage } from "@langchain/core/messages";
-import type { ChatOllama } from "@langchain/ollama";
 import type { AgentStateType } from "../../types/state";
 import summarizePrompt from "../../types/prompts/Summarize";
 import { useFraudeStore } from "../../store/useFraudeStore";
+import { generalModel } from "../../services/llm";
 
-const { updateOutput } = useFraudeStore.getState();
-export const createSummarizeNode = (
-  coderModel: ChatOllama,
-  signal?: AbortSignal
-) => {
-  return async (state: AgentStateType) => {
-    updateOutput("log", "Generating summary (llama3.1:latest)...");
+const { updateOutput, setStatus } = useFraudeStore.getState();
+export const createSummarizeNode = () => {
+  return async (state: AgentStateType, config?: any) => {
+    setStatus("Generating summary (llama3.1:latest)");
 
     let codeContext = "";
     if (state.qdrantResults && state.qdrantResults.length > 0) {
@@ -30,17 +27,28 @@ export const createSummarizeNode = (
     // updateOutput("log", `Coder prompt size: ${promptSize} characters`);
 
     let summary = "";
-    const stream = await coderModel.stream([new HumanMessage(prompt)], {
+    const signal = config?.signal;
+    const stream = await generalModel.stream([new HumanMessage(prompt)], {
       signal,
     });
+    let lastChunk = null;
     for await (const chunk of stream) {
       if (signal?.aborted) break;
       const content = chunk.content as string;
       summary += content;
+      lastChunk = chunk;
       updateOutput("markdown", summary, "Implementation Details");
     }
+    if (lastChunk?.usage_metadata) {
+      const usage = lastChunk.usage_metadata;
 
-    updateOutput("log", "Implementation complete.");
+      useFraudeStore.getState().updateTokenUsage({
+        total: usage.total_tokens,
+        prompt: usage.input_tokens,
+        completion: usage.output_tokens,
+      });
+    }
+    // setStatus("Implementation complete.");
 
     return {
       summary,
