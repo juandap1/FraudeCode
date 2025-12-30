@@ -6,7 +6,7 @@ const OLLAMA_EMBED_URL =
 const EMBED_MODEL = process.env.EMBED_MODEL || "snowflake-arctic-embed:latest";
 const QDRANT_URL = process.env.QDRANT_URL || "http://localhost:6333";
 
-class QdrantCli {
+export class QdrantCli {
   client: QdrantClient;
   reranker: any;
 
@@ -159,4 +159,9 @@ class QdrantCli {
   }
 }
 
-export default QdrantCli;
+const qdrant = new QdrantCli();
+qdrant
+  .init()
+  .catch((err) => console.error("Failed to initialize Qdrant:", err));
+
+export default qdrant;

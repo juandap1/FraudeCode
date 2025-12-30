@@ -1,7 +1,5 @@
 import { StateGraph, END, START } from "@langchain/langgraph";
 import type { ChatOllama } from "@langchain/ollama";
-import Neo4jClient from "../../services/neo4j";
-import QdrantCli from "../../services/qdrant";
 import { AgentState, type PendingChange } from "../../types/state";
 
 // Nodes
@@ -9,42 +7,31 @@ import { createSearchQdrantNode } from "../nodes/searchQdrant";
 import { createSearchNeo4jNode } from "../nodes/searchNeo4j";
 import { createGatherFilesNode } from "../nodes/gatherFiles";
 import { createCombineContextNode } from "../nodes/combineContext";
-import { createThinkNode } from "../nodes/think";
-import { createCodeNode } from "../nodes/code";
+import { createThinkNode } from "../nodes/thinkModifications";
+import { createCodeNode } from "../nodes/codeModifications";
 import { createVerifyNode } from "../nodes/verify";
 import { createSaveChangesNode } from "../nodes/saveChanges";
+import { useFraudeStore } from "../../store/useFraudeStore";
 
 export default async function langgraphModify(
   query: string,
-  neo4j: Neo4jClient,
-  qdrant: QdrantCli,
   thinkerModel: ChatOllama,
   coderModel: ChatOllama,
-  updateOutput: (
-    type: "log" | "diff" | "confirmation" | "markdown",
-    content: string,
-    title?: string,
-    changes?: PendingChange[]
-  ) => void,
   promptUserConfirmation: () => Promise<boolean>,
-  setPendingChanges: (changes: PendingChange[]) => void,
   signal?: AbortSignal
 ) {
   const repoName = "sample";
   const repoPath = "/Users/mbranni03/Documents/GitHub/FraudeCode/sample";
 
   const workflow = new StateGraph(AgentState)
-    .addNode("searchQdrant", createSearchQdrantNode(qdrant, updateOutput))
-    .addNode("searchNeo4j", createSearchNeo4jNode(neo4j, updateOutput))
-    .addNode("gatherFiles", createGatherFilesNode(updateOutput))
-    .addNode("combineContext", createCombineContextNode(updateOutput))
-    .addNode("think", createThinkNode(thinkerModel, updateOutput, signal))
-    .addNode("code", createCodeNode(coderModel, updateOutput, signal))
-    .addNode("verify", createVerifyNode(updateOutput, setPendingChanges))
-    .addNode(
-      "saveChanges",
-      createSaveChangesNode(updateOutput, promptUserConfirmation)
-    );
+    .addNode("searchQdrant", createSearchQdrantNode())
+    .addNode("searchNeo4j", createSearchNeo4jNode())
+    .addNode("gatherFiles", createGatherFilesNode())
+    .addNode("combineContext", createCombineContextNode())
+    .addNode("think", createThinkNode(thinkerModel, signal))
+    .addNode("code", createCodeNode(coderModel, signal))
+    .addNode("verify", createVerifyNode())
+    .addNode("saveChanges", createSaveChangesNode(promptUserConfirmation));
 
   workflow.addEdge(START, "searchQdrant");
   workflow.addEdge("searchQdrant", "searchNeo4j");
@@ -60,6 +47,7 @@ export default async function langgraphModify(
 
   const finalState = (await app.invoke(
     {
+      id: useFraudeStore.getState().currentInteractionId || "",
       query,
       repoName,
       repoPath,

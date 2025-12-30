@@ -1,5 +1,5 @@
 import { memo } from "react";
-import type { OutputItem } from "../../utils/ollamacli";
+import type { OutputItem } from "../../store/useFraudeStore";
 import CommandView from "./CommandView";
 import { Box, Text } from "ink";
 import Markdown from "@inkkit/ink-markdown";

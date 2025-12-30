@@ -1,8 +1,9 @@
 import * as fs from "fs";
 import type { AgentStateType } from "../../types/state";
+import { useFraudeStore } from "../../store/useFraudeStore";
 
+const { updateOutput } = useFraudeStore.getState();
 export const createSaveChangesNode = (
-  updateOutput: (type: "log", content: string) => void,
   promptUserConfirmation: () => Promise<boolean>
 ) => {
   return async (state: AgentStateType) => {

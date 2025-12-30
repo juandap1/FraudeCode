@@ -1,79 +1,46 @@
 import type Neo4jClient from "../../services/neo4j";
 import type QdrantCli from "../../services/qdrant";
+import { AgentState, type PendingChange } from "../../types/state";
+import { StateGraph, END, START } from "@langchain/langgraph";
+import { createGetProjectStructureNode } from "../nodes/getProjectStructure";
+import { createSearchQdrantNode } from "../nodes/searchQdrant";
+import { createSummarizeNode } from "../nodes/summarize";
+import type { ChatOllama } from "@langchain/ollama";
 
 export default async function summarizeProject(
-  neo4j: Neo4jClient,
-  qdrant: QdrantCli,
-  action: (payload: any) => Promise<void>
+  coderModel: ChatOllama,
+  signal?: AbortSignal
 ) {
   const repoName = "sample";
+  const repoPath = "/Users/mbranni03/Documents/GitHub/FraudeCode/sample";
 
-  // 1. Fetch Structure from Neo4j
-  const session = neo4j.driver.session();
-  let structureData = "";
-  try {
-    const result = await session.run(
-      `
-            MATCH (f:File)-[d:DEFINES]->(child)
-            WHERE f.path STARTS WITH $repoName
-            RETURN f.path as filePath, labels(child)[0] as type, child.name as name
-            ORDER BY filePath, type
-        `,
-      { repoName }
-    );
+  const workflow = new StateGraph(AgentState)
+    .addNode("getProjectStructure", createGetProjectStructureNode())
+    .addNode("searchQdrant", createSearchQdrantNode())
+    .addNode("summarize", createSummarizeNode(coderModel, signal));
 
-    const fileMap: Record<string, string[]> = {};
-    result.records.forEach((r) => {
-      const path = r.get("filePath");
-      const type = r.get("type");
-      const name = r.get("name");
-      if (!fileMap[path]) fileMap[path] = [];
-      fileMap[path].push(`${type}: ${name}`);
-    });
+  workflow.addEdge(START, "getProjectStructure");
+  workflow.addEdge("getProjectStructure", "searchQdrant");
+  workflow.addEdge("searchQdrant", "summarize");
+  workflow.addEdge("summarize", END);
 
-    for (const [path, items] of Object.entries(fileMap)) {
-      structureData +=
-        `File: ${path}\n` + items.map((i) => `  - ${i}`).join("\n") + "\n\n";
-    }
-  } finally {
-    await session.close();
-  }
+  const query = "Overview of the project functions and classes";
 
-  // 2. Fetch some context from Qdrant
-  console.log("Querying Qdrant for project context...");
-  const searchResults = await qdrant.hybridSearch(
-    repoName,
-    "Overview of the project functions and classes"
-  );
+  const app = workflow.compile();
+  const finalState = (await app.invoke(
+    {
+      query,
+      repoName,
+      repoPath,
+      status: "started",
+      pendingChanges: [],
+      userConfirmed: false,
+      llmContext: { thinkerPromptSize: 0, coderPromptSize: 0 },
+    },
+    { signal }
+  )) as any;
 
-  let codeContext = "";
-  if (searchResults && searchResults.length > 0) {
-    searchResults.slice(0, 10).forEach((p: any) => {
-      codeContext += `Snippet from ${p.payload.filePath} (symbol: ${p.payload.symbol}):\n${p.payload.rawDocument}\n---\n`;
-    });
-  }
-
-  // 3. Synthesize summary
-  const prompt = `
-You are a senior software architect. Analyze the follow project structure and code snippets from the "${repoName}" project.
-Then provide:
-1. A brief overview of what the overall project can do.
-2. A description of each file and its role in the project.
-3. The overall project structure.
-
-Project Structure:
-${structureData}
-
-Code Context:
-${codeContext}
-
-Full Response:
-`;
-
-  const payload = {
-    messages: [{ role: "user", content: prompt }],
-    options: { temperature: 0.6 },
+  return {
+    summary: finalState.summary,
   };
-
-  await action(payload);
 }

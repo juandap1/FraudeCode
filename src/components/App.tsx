@@ -1,52 +1,75 @@
 import IntroComponent from "./IntroComponent";
 import { Box, useInput } from "ink";
+import { useCallback, useEffect, useState } from "react";
 import useOllamaClient from "../hooks/useOllamaClient";
 import OllamaClientComponent from "./OllamaClientComponent";
-import { useState, useEffect } from "react";
+import { useFraudeStore, useInteraction } from "../store/useFraudeStore";
 import log from "../utils/logger";
 
-const Session = ({ onDone }: { onDone: () => void }) => {
-  const OllamaClient = useOllamaClient("llama3.1:latest");
+const Session = ({
+  interactionId,
+  onDone,
+  isLast,
+}: {
+  interactionId: string | null;
+  onDone: () => void;
+  isLast: boolean;
+}) => {
+  const OllamaClient = useOllamaClient(interactionId);
+  const interaction = useInteraction(interactionId);
 
   useInput((input, key) => {
-    if (key.escape || input === "\u001b") {
+    if (isLast && (key.escape || input === "\u001b")) {
       OllamaClient.interrupt();
     }
   });
 
   useEffect(() => {
-    if (OllamaClient.status === 2 || OllamaClient.status === -1) {
+    if (isLast && (interaction?.status === 2 || interaction?.status === -1)) {
       onDone();
     }
-  }, [OllamaClient.status, onDone]);
+  }, [interaction?.status, onDone, isLast]);
 
   return <OllamaClientComponent OllamaClient={OllamaClient} />;
 };
 
 export default function App() {
-  const [started, setStarted] = useState(false);
-  const [sessions, setSessions] = useState([0]);
-  log("App started");
+  const started = useFraudeStore((state) => state.started);
+  const interactionOrder = useFraudeStore((state) => state.interactionOrder);
+  const lastInteractionId = useFraudeStore(
+    (state) => state.currentInteractionId
+  );
+
+  // log(`App rendering with ${interactions.length} interactions`);
 
   useInput((input, key) => {
-    if (key.return) {
-      setStarted(true);
+    if (key.return && !started) {
+      useFraudeStore.setState({ started: true });
+      useFraudeStore.getState().addInteraction();
+      log("App Started...");
     }
   });
 
-  const handleDone = (index: number) => {
-    if (index === sessions.length - 1) {
-      setSessions((prev) => [...prev, prev.length]);
-    }
-  };
+  const onDone = useCallback(() => {
+    const { addInteraction } = useFraudeStore.getState();
+    addInteraction();
+  }, []);
 
   return (
     <Box flexDirection="column">
       {!started && <IntroComponent />}
-      {started &&
-        sessions.map((key, index) => (
-          <Session key={key} onDone={() => handleDone(index)} />
-        ))}
+      {started && (
+        <>
+          {interactionOrder.map((id) => (
+            <Session
+              key={id}
+              interactionId={id}
+              isLast={id === lastInteractionId}
+              onDone={onDone}
+            />
+          ))}
+        </>
+      )}
     </Box>
   );
 }

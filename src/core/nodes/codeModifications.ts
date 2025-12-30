@@ -2,14 +2,12 @@ import { HumanMessage } from "@langchain/core/messages";
 import type { ChatOllama } from "@langchain/ollama";
 import type { AgentStateType } from "../../types/state";
 import ModificationCodeChangesPrompt from "../../types/prompts/modify/CodeChanges";
+import { useFraudeStore } from "../../store/useFraudeStore";
+
+const { updateOutput } = useFraudeStore.getState();
 
 export const createCodeNode = (
   coderModel: ChatOllama,
-  updateOutput: (
-    type: "log" | "markdown",
-    content: string,
-    title?: string
-  ) => void,
   signal?: AbortSignal
 ) => {
   return async (state: AgentStateType) => {
@@ -32,6 +30,7 @@ export const createCodeNode = (
       signal,
     });
     for await (const chunk of stream) {
+      if (signal?.aborted) break;
       const content = chunk.content as string;
       modifications += content;
       updateOutput("markdown", modifications, "Implementation Details");

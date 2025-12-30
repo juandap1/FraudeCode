@@ -2,14 +2,12 @@ import { HumanMessage } from "@langchain/core/messages";
 import type { ChatOllama } from "@langchain/ollama";
 import type { AgentStateType } from "../../types/state";
 import ModificationThinkPrompt from "../../types/prompts/modify/Think";
+import { useFraudeStore } from "../../store/useFraudeStore";
+
+const { updateOutput } = useFraudeStore.getState();
 
 export const createThinkNode = (
   thinkerModel: ChatOllama,
-  updateOutput: (
-    type: "log" | "markdown",
-    content: string,
-    title?: string
-  ) => void,
   signal?: AbortSignal
 ) => {
   return async (state: AgentStateType) => {
@@ -30,6 +28,7 @@ export const createThinkNode = (
       signal,
     });
     for await (const chunk of stream) {
+      if (signal?.aborted) break;
       const content = chunk.content as string;
       thinkingProcess += content;
       updateOutput("markdown", thinkingProcess, "Implementation Plan");

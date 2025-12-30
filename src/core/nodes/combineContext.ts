@@ -1,8 +1,9 @@
 import type { AgentStateType } from "../../types/state";
+import { useFraudeStore } from "../../store/useFraudeStore";
 
-export const createCombineContextNode = (
-  updateOutput: (type: "log", content: string) => void
-) => {
+const { updateOutput } = useFraudeStore.getState();
+
+export const createCombineContextNode = () => {
   return async (state: AgentStateType) => {
     updateOutput("log", "📦 [STEP 4/4] Combining context...");
 

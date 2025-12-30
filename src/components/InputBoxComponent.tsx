@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useApp, Box, Text } from "ink";
 import TextInput from "ink-text-input";
-import type { OllamaCLI } from "../utils/ollamacli";
+import type { OllamaCLI } from "../hooks/useOllamaClient";
 
 const InputBoxComponent = ({ OllamaClient }: { OllamaClient: OllamaCLI }) => {
   const [value, setValue] = useState("");

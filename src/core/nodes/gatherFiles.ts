@@ -1,10 +1,11 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { AgentStateType } from "../../types/state";
+import { useFraudeStore } from "../../store/useFraudeStore";
 
-export const createGatherFilesNode = (
-  updateOutput: (type: "log", content: string) => void
-) => {
+const { updateOutput } = useFraudeStore.getState();
+
+export const createGatherFilesNode = () => {
   return async (state: AgentStateType) => {
     updateOutput("log", "📄 [STEP 3/4] Reading file contents...");
 

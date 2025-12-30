@@ -7,4 +7,8 @@ const log = (...args: any[]) => {
   );
 };
 
+export const resetLog = () => {
+  fs.writeFileSync("debug.log", "");
+};
+
 export default log;
