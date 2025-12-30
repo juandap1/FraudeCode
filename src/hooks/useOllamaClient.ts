@@ -1,9 +1,13 @@
 import { useCallback, useRef, useEffect, useState } from "react";
-import summarizeProject from "../core/actions/summarize_project";
+
 import qdrant from "../services/qdrant";
 import type { PendingChange } from "../types/state";
-import langgraphModify from "../core/actions/langgraph_modify";
+
 import { thinkerModel, coderModel } from "../services/llm";
+import { createModifyProjectTool } from "../core/tools/ModifyProjectTool";
+import { createSummarizeProjectTool } from "../core/tools/SummarizeProjectTool";
+import { createRouterGraph } from "../core/agent/router";
+import { HumanMessage } from "@langchain/core/messages";
 import { useFraudeStore, useInteraction } from "../store/useFraudeStore";
 import log from "../utils/logger";
 
@@ -59,29 +63,35 @@ export function useOllamaClient(initialId: string | null = null): OllamaCLI {
         abortRef.current = new AbortController();
         const signal = abortRef.current.signal;
 
-        if (query.trim() === "/summarize") {
-          await summarizeProject(coderModel, signal);
-          updateInteraction(id, { status: 2 });
-        } else if (query.trim().startsWith("/modify")) {
-          const prompt = query.trim().split(" ").slice(1).join(" ") || "";
-          if (prompt.length === 0) {
-            updateInteraction(id, { status: 2 });
-            updateOutput("log", "No prompt provided");
-            return;
-          } else {
-            await langgraphModify(
-              prompt,
-              thinkerModel,
-              coderModel,
-              promptUserConfirmation,
-              signal
-            );
-            updateInteraction(id, { pendingConfirmation: false, status: 2 });
-          }
-        } else {
-          updateInteraction(id, { status: 2 });
-          updateOutput("log", "Command not found");
-        }
+        const tools = [
+          createModifyProjectTool(
+            thinkerModel,
+            coderModel,
+            promptUserConfirmation,
+            signal
+          ),
+          createSummarizeProjectTool(coderModel, signal),
+        ];
+
+        const router = createRouterGraph(thinkerModel, tools);
+
+        await router.invoke(
+          { messages: [new HumanMessage(query)] },
+          { configurable: { thread_id: id } }
+        );
+
+        // Update status to done after router finishes (if it executes an action)
+        // Note: The actions themselves might need to update status or we might need to listen to events.
+        // For now, let's assume if the router finishes, we are done or waiting for confirmation (handled inside tools).
+        // However, if the tool runs `langgraphModify`, it updates status internally?
+        // `langgraphModify` returns a state, but doesn't strictly update the store status to "done" (2)
+        // except at the end of the manual flow in the original code.
+        // But `langgraphModify` itself calls `updateInteraction`?
+        // Let's check `langgraphModify` again. It returns `finalState`. It does NOT call `updateInteraction` directly to set status to done.
+        // The original `handleQuery` did that: `updateInteraction(id, { pendingConfirmation: false, status: 2 });`
+
+        // So we should probably update status to 2 here after invoke.
+        updateInteraction(id, { status: 2 });
       } catch (error: any) {
         if (error.name !== "AbortError") {
           console.error("[ERROR] ", error);
