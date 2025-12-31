@@ -26,7 +26,7 @@ const iterationLoop = async (
       if (comment.trim() === "") {
         continue;
       }
-      updateOutput("command", comment);
+      updateOutput("comment", comment);
       setStatus("Modifying plan (qwen3:8b)");
       const iteratePrompt = generateIterationPrompt(
         state.query,

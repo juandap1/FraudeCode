@@ -1,6 +1,7 @@
 import { memo } from "react";
 import type { OutputItem } from "../../store/useFraudeStore";
 import CommandView from "./CommandView";
+import CommentView from "./CommentView";
 import { Box, Text } from "ink";
 import Markdown from "@inkkit/ink-markdown";
 import DiffViewer from "./DiffViewer";
@@ -10,6 +11,8 @@ const OutputRenderer = memo(({ item }: { item: OutputItem }) => {
   switch (item.type) {
     case "command":
       return <CommandView command={item.content} />;
+    case "comment":
+      return <CommentView command={item.content} />;
     case "log":
       return item.content || item.title ? (
         <Box flexDirection="column" marginBottom={1}>

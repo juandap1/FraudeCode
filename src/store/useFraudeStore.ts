@@ -6,7 +6,8 @@ export type OutputItemType =
   | "markdown"
   | "diff"
   | "confirmation"
-  | "command";
+  | "command"
+  | "comment";
 
 export interface TokenUsage {
   total: number;
