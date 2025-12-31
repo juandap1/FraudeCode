@@ -3,6 +3,15 @@ import { useApp, Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import type { OllamaCLI } from "../hooks/useOllamaClient";
 import { useFraudeStore } from "../store/useFraudeStore";
+import { homedir } from "os";
+
+const shortenPath = (path: string) => {
+  const home = homedir();
+  if (path.startsWith(home)) {
+    return path.replace(home, "~");
+  }
+  return path;
+};
 
 const InputBoxComponent = ({ OllamaClient }: { OllamaClient: OllamaCLI }) => {
   const [value, setValue] = useState("");
@@ -34,6 +43,12 @@ const InputBoxComponent = ({ OllamaClient }: { OllamaClient: OllamaCLI }) => {
         setInputKey((k) => k + 1);
       }
     }
+
+    if (key.tab) {
+      const executionMode = useFraudeStore.getState().executionMode;
+      const newMode = executionMode === "Fast" ? "Planning" : "Fast";
+      useFraudeStore.setState({ executionMode: newMode });
+    }
   });
 
   return (
@@ -64,6 +79,13 @@ const InputBoxComponent = ({ OllamaClient }: { OllamaClient: OllamaCLI }) => {
             }}
           />
         </Box>
+      </Box>
+      <Box width={70} justifyContent="space-between" paddingX={1}>
+        <Text color="gray">{shortenPath(process.cwd())}</Text>
+        <Text color="cyan">
+          <Text bold>{useFraudeStore.getState().executionMode}</Text> (Tab to
+          toggle)
+        </Text>
       </Box>
     </Box>
   );

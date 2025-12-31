@@ -56,6 +56,8 @@ interface FraudeStore {
   promptUserConfirmation: (id?: string) => Promise<boolean>;
   resolveConfirmation: (confirmed: boolean, id?: string) => void;
   addToHistory: (query: string) => void;
+  executionMode: "Planning" | "Fast";
+  setExecutionMode: (mode: "Planning" | "Fast") => void;
 }
 
 export const useFraudeStore = create<FraudeStore>((set) => ({
@@ -65,6 +67,7 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
   currentInteractionId: null,
   abortController: null,
   history: [],
+  executionMode: "Fast",
   addInteraction: () => {
     const id = crypto.randomUUID();
     const newInteraction: InteractionState = {
@@ -229,6 +232,7 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
       return { history: newHistory };
     });
   },
+  setExecutionMode: (mode) => set({ executionMode: mode }),
 }));
 
 let confirmationResolver: ((confirmed: boolean) => void) | null = null;
