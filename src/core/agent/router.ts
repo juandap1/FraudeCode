@@ -62,6 +62,8 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
         completion: usage.output_tokens,
       });
     }
+    log("CallModel response: ", JSON.stringify(response, null, 2));
+    log("CallModel usage: ", JSON.stringify(usage, null, 2));
 
     if (
       response.content &&
@@ -71,16 +73,6 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
         .getState()
         .updateOutput("markdown", response.content.toString());
     }
-
-    if (response.tool_calls && response.tool_calls.length > 0) {
-      log(
-        "Tool calls detected: ",
-        JSON.stringify(response.tool_calls, null, 2)
-      );
-    } else {
-      log("No tool calls detected in project response.");
-    }
-
     return { messages: [response] };
   };
 
