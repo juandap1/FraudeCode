@@ -15,7 +15,7 @@ interface RouterState {
   messages: BaseMessage[];
 }
 
-const { setStatus } = useFraudeStore.getState();
+const { setStatus, updateTokenUsage, updateOutput } = useFraudeStore.getState();
 
 export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
   const modelWithTools = generalModel.bindTools(tools);
@@ -35,7 +35,7 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
     ]);
     const usage = response.usage_metadata;
     if (usage) {
-      useFraudeStore.getState().updateTokenUsage({
+      updateTokenUsage({
         total: usage.total_tokens,
         prompt: usage.input_tokens,
         completion: usage.output_tokens,
@@ -43,6 +43,10 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
     }
     const decision = response.content.toString().toLowerCase().trim();
     log("Scout Decision: ", decision);
+    updateOutput(
+      "checkpoint",
+      `Analyzed request [${usage?.total_tokens} tokens]`
+    );
     return decision.includes("project") ? "project" : "general";
   };
 
@@ -56,7 +60,7 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
     });
     const usage = response.usage_metadata;
     if (usage) {
-      useFraudeStore.getState().updateTokenUsage({
+      updateTokenUsage({
         total: usage.total_tokens,
         prompt: usage.input_tokens,
         completion: usage.output_tokens,
@@ -69,10 +73,12 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
       response.content &&
       (!response.tool_calls || response.tool_calls.length === 0)
     ) {
-      useFraudeStore
-        .getState()
-        .updateOutput("markdown", response.content.toString());
+      updateOutput("markdown", response.content.toString());
     }
+    updateOutput(
+      "checkpoint",
+      `Considered options [${usage?.total_tokens} tokens]`
+    );
     return { messages: [response] };
   };
 
@@ -88,14 +94,12 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
       fullResponse = fullResponse ? fullResponse.concat(chunk) : chunk;
       lastChunk = chunk;
       if (fullResponse.content) {
-        useFraudeStore
-          .getState()
-          .updateOutput("markdown", fullResponse.content.toString());
+        updateOutput("markdown", fullResponse.content.toString());
       }
     }
     if (lastChunk?.usage_metadata) {
       const usage = lastChunk.usage_metadata;
-      useFraudeStore.getState().updateTokenUsage({
+      updateTokenUsage({
         total: usage.total_tokens,
         prompt: usage.input_tokens,
         completion: usage.output_tokens,

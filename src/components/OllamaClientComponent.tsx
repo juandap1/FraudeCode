@@ -53,6 +53,7 @@ const OllamaClientComponent = ({
 
       {interaction.status !== 0 && interaction.status !== 4 && (
         <LoaderComponent
+          id={interaction.interactionId}
           status={interaction.status}
           tokenUsage={interaction.tokenUsage}
           statusText={interaction.statusText}
@@ -62,7 +63,7 @@ const OllamaClientComponent = ({
       {interaction.status === 0 && (
         <InputBoxComponent OllamaClient={OllamaClient} />
       )}
-      <Text>Status: {interaction.status}</Text>
+      {/* <Text>Status: {interaction.status}</Text> */}
     </Box>
   );
 };

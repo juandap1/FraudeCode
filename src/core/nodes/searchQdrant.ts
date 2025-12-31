@@ -24,6 +24,7 @@ export const createSearchQdrantNode = () => {
     }
 
     updateOutput("log", `Found ${filePaths.length} relevant files.`);
+    updateOutput("checkpoint", "Qdrant search complete");
 
     return {
       qdrantResults: searchResults || [],

@@ -36,7 +36,7 @@ export const createGetProjectStructureNode = () => {
     } finally {
       await session.close();
     }
-
+    updateOutput("checkpoint", "Fetched project structure");
     return {
       status: "completed",
       structuralContext: structureData,

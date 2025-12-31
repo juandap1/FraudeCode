@@ -42,8 +42,9 @@ export const createCodeNode = () => {
       lastChunk = chunk;
       updateOutput("markdown", modifications, "Implementation Details");
     }
+    let usage = null;
     if (lastChunk?.usage_metadata) {
-      const usage = lastChunk.usage_metadata;
+      usage = lastChunk.usage_metadata;
 
       useFraudeStore.getState().updateTokenUsage({
         total: usage.total_tokens,
@@ -51,7 +52,10 @@ export const createCodeNode = () => {
         completion: usage.output_tokens,
       });
     }
-    // setStatus("Implementation complete.");
+    updateOutput(
+      "checkpoint",
+      `Generated code changes [${usage?.output_tokens} tokens]`
+    );
 
     return {
       modifications,

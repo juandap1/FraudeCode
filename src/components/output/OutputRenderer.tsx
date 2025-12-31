@@ -24,6 +24,16 @@ const OutputRenderer = memo(({ item }: { item: OutputItem }) => {
           {item.content && <Text>{item.content}</Text>}
         </Box>
       ) : null;
+    case "checkpoint":
+      return (
+        <Box flexDirection="column" marginBottom={1}>
+          {item.content && (
+            <Text bold color="rgb(255, 105, 180)">
+              {item.content}
+            </Text>
+          )}
+        </Box>
+      );
     case "markdown":
       return (
         <Box marginLeft={1}>

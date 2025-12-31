@@ -31,6 +31,7 @@ export const createSearchNeo4jNode = () => {
           : "No structural context found."
       }`
     );
+    updateOutput("checkpoint", "Neo4j search complete");
 
     return {
       structuralContext,

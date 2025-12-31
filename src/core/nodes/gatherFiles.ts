@@ -25,6 +25,7 @@ export const createGatherFilesNode = () => {
     }
 
     updateOutput("log", `Loaded ${Object.keys(fileContents).length} file(s).`);
+    updateOutput("checkpoint", "Gathered files");
 
     return {
       codeContext,

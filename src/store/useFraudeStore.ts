@@ -7,6 +7,7 @@ export type OutputItemType =
   | "diff"
   | "confirmation"
   | "command"
+  | "checkpoint"
   | "comment";
 
 export interface TokenUsage {
@@ -31,6 +32,8 @@ export interface InteractionState {
   elapsedTime: number;
   pendingChanges: PendingChange[];
   statusText?: string;
+  lastBreak: number;
+  timeElapsed: number;
 }
 
 export type SelectItem = {
@@ -99,6 +102,8 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
       elapsedTime: 0,
       pendingChanges: [],
       statusText: undefined,
+      lastBreak: 0,
+      timeElapsed: 0,
     };
     set((state) => ({
       interactions: { ...state.interactions, [id]: newInteraction },
@@ -150,7 +155,20 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
       if (!interaction) return state;
       const outputItems = [...interaction.outputItems];
       const latestOutput = outputItems[outputItems.length - 1];
-      if (latestOutput && latestOutput.type === type && type !== "log") {
+      let extraChanges = {};
+      if (type === "checkpoint") {
+        let elapsed = interaction.timeElapsed - interaction.lastBreak;
+        extraChanges = {
+          lastBreak: interaction.timeElapsed,
+        };
+        content += ` · (${(elapsed / 10).toFixed(1)}s)`;
+      }
+      if (
+        latestOutput &&
+        latestOutput.type === type &&
+        type !== "log" &&
+        type !== "checkpoint"
+      ) {
         outputItems[outputItems.length - 1] = {
           ...latestOutput,
           content,
@@ -170,6 +188,7 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
           ...state.interactions,
           [interactionId]: {
             ...interaction,
+            ...extraChanges,
             outputItems,
           },
         },

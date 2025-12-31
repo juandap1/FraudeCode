@@ -34,7 +34,15 @@ const iterationLoop = async (
         plan,
         comment
       );
-      plan = await think(iteratePrompt, config?.signal);
+      const { thinkingProcess, usage } = await think(
+        iteratePrompt,
+        config?.signal
+      );
+      plan = thinkingProcess;
+      updateOutput(
+        "checkpoint",
+        `Modified plan [${usage?.total_tokens} tokens]`
+      );
     } else if (check === 2) {
       return { approved: false, plan };
     }
@@ -57,8 +65,9 @@ const think = async (prompt: string, signal?: AbortSignal) => {
     lastChunk = chunk;
     updateOutput("markdown", thinkingProcess, "Implementation Plan");
   }
+  let usage = null;
   if (lastChunk?.usage_metadata) {
-    const usage = lastChunk.usage_metadata;
+    usage = lastChunk.usage_metadata;
 
     useFraudeStore.getState().updateTokenUsage({
       total: usage.total_tokens,
@@ -66,7 +75,7 @@ const think = async (prompt: string, signal?: AbortSignal) => {
       completion: usage.output_tokens,
     });
   }
-  return thinkingProcess;
+  return { thinkingProcess, usage };
 };
 
 export const createImplementationPlanNode = () => {
@@ -83,7 +92,11 @@ export const createImplementationPlanNode = () => {
     updateOutput("log", `Thinker prompt size: ${promptSize} characters`);
 
     updateOutput("markdown", "", "Implementation Plan");
-    let thinkingProcess = await think(prompt, config?.signal);
+    const { thinkingProcess, usage } = await think(prompt, config?.signal);
+    updateOutput(
+      "checkpoint",
+      `Created Implementation Plan [${usage?.total_tokens} tokens]`
+    );
     const { approved, plan } = await iterationLoop(
       thinkingProcess,
       state,
