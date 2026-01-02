@@ -28,7 +28,7 @@ ${codeContext}
 
 OUTPUT RULES IMPORTANT:
 
-- Output ONLY valid ADD or REMOVE patch blocks
+- TYPE can be either ADD or REMOVE
 - Do NOT include explanations, notes, reasoning, intent analysis, or summaries
 - Do NOT include any text outside the patch format
 - Line numbers always refer to the ORIGINAL file content
@@ -39,7 +39,7 @@ OUTPUT FORMAT (EXACT):
 
 FILE: <path/to/file>
 AT LINE <line_number>:
-<ADD | REMOVE>:
+<TYPE>:
 \`\`\`<language>
 <exact code to add or remove>
 \`\`\`
