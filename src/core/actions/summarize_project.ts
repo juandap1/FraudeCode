@@ -30,7 +30,6 @@ export default async function summarizeProject(signal?: AbortSignal) {
       status: "started",
       pendingChanges: [],
       userConfirmed: false,
-      llmContext: { thinkerPromptSize: 0, coderPromptSize: 0 },
     },
     { signal }
   )) as any;

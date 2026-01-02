@@ -61,7 +61,6 @@ export default async function langgraphModify(
       status: "started",
       pendingChanges: [],
       userConfirmed: false,
-      llmContext: { thinkerPromptSize: 0, coderPromptSize: 0 },
     },
     { signal }
   )) as any;

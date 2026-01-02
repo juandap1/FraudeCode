@@ -14,23 +14,10 @@ export const createSearchQdrantNode = () => {
       state.query
     );
 
-    const filePaths: string[] = [];
-    if (searchResults) {
-      for (const res of searchResults as any[]) {
-        const filePath = res.payload.filePath;
-        if (filePath && !filePaths.includes(filePath)) {
-          filePaths.push(filePath);
-        }
-      }
-    }
-
-    updateOutput("log", `Found ${filePaths.length} relevant files.`);
-    log("Found files: ", filePaths);
     updateOutput("checkpoint", "Qdrant search complete");
 
     return {
       qdrantResults: searchResults || [],
-      filePaths,
       status: "qdrant_search_complete",
     };
   };

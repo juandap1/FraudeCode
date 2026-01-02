@@ -52,10 +52,6 @@ export const createSummarizeNode = () => {
 
     return {
       summary,
-      llmContext: {
-        ...state.llmContext,
-        coderPromptSize: promptSize,
-      },
       status: "summary_generated",
     };
   };

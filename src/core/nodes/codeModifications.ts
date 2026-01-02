@@ -63,10 +63,6 @@ export const createCodeNode = () => {
 
     return {
       modifications,
-      llmContext: {
-        ...state.llmContext,
-        coderPromptSize: promptSize,
-      },
       status: "code_generated",
     };
   };

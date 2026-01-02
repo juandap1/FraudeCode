@@ -14,6 +14,7 @@ export const AgentState = Annotation.Root({
   repoName: Annotation<string>(),
   qdrantResults: Annotation<any[]>(),
   filePaths: Annotation<string[]>(),
+  funcs: Annotation<string[]>(),
   structuralContext: Annotation<string>(),
   codeContext: Annotation<string>(),
   thinkingProcess: Annotation<string>(),
@@ -21,10 +22,6 @@ export const AgentState = Annotation.Root({
   diffs: Annotation<string>(),
   pendingChanges: Annotation<PendingChange[]>(),
   userConfirmed: Annotation<boolean>(),
-  llmContext: Annotation<{
-    thinkerPromptSize: number;
-    coderPromptSize: number;
-  }>(),
   summary: Annotation<string>(),
   error: Annotation<string | undefined>(),
   status: Annotation<string>(),

@@ -108,10 +108,6 @@ export const createImplementationPlanNode = () => {
     }
     return {
       thinkingProcess: plan,
-      llmContext: {
-        ...state.llmContext,
-        thinkerPromptSize: promptSize,
-      },
       status: "planning_complete",
     };
   };
