@@ -15,7 +15,7 @@ export const AgentState = Annotation.Root({
   qdrantResults: Annotation<any[]>(),
   filePaths: Annotation<string[]>(),
   funcs: Annotation<string[]>(),
-  structuralContext: Annotation<string>(),
+  structuralContext: Annotation<any[]>(),
   codeContext: Annotation<string>(),
   thinkingProcess: Annotation<string>(),
   modifications: Annotation<string>(),

@@ -8,36 +8,33 @@ export const createSearchNeo4jNode = () => {
   return async (state: AgentStateType) => {
     setStatus("Searching Neo4j for structural context");
 
-    const filePaths: string[] = [];
     const funcs: string[] = [];
+    const filePaths: string[] = [];
     if (state.qdrantResults) {
       for (const res of state.qdrantResults as any[]) {
-        const filePath = res.payload.filePath;
         const func = res.payload.symbol;
-        if (filePath && !filePaths.includes(filePath)) {
-          filePaths.push(filePath);
-        }
+        const filePath = res.payload.filePath;
         if (func && !funcs.includes(func)) {
           funcs.push(func);
+        }
+        if (filePath && !filePaths.includes(filePath)) {
+          filePaths.push(filePath);
         }
       }
     }
 
-    let structuralContext = "";
+    let structuralContext: any[] = [];
 
     for (const symbol of funcs) {
       setStatus(`Inspecting symbol: "${symbol}"`);
       const symContext = await neo4jClient.getContextBySymbol(symbol);
       if (symContext.length > 0) {
-        structuralContext +=
-          `Symbol info for "${symbol}":` +
-          JSON.stringify(symContext, null, 2) +
-          "";
-        log(`Symbol info for ${symbol}: `, symContext);
+        structuralContext.push(symContext);
       }
     }
 
     const foundSymbols = structuralContext.length > 0;
+    if (foundSymbols) structuralContext = structuralContext.flat();
     updateOutput(
       "log",
       `${

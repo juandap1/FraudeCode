@@ -4,7 +4,6 @@ import { AgentState } from "../../types/state";
 // Nodes
 import { createSearchQdrantNode } from "../nodes/searchQdrant";
 import { createSearchNeo4jNode } from "../nodes/searchNeo4j";
-import { createGatherFilesNode } from "../nodes/gatherFiles";
 import { createCombineContextNode } from "../nodes/combineContext";
 import { createImplementationPlanNode } from "../nodes/implementationPlan";
 import { createCodeNode } from "../nodes/codeModifications";
@@ -23,7 +22,6 @@ export default async function langgraphModify(
   const workflow = new StateGraph(AgentState)
     .addNode("searchQdrant", createSearchQdrantNode())
     .addNode("searchNeo4j", createSearchNeo4jNode())
-    .addNode("gatherFiles", createGatherFilesNode())
     .addNode("combineContext", createCombineContextNode())
     .addNode("think", createImplementationPlanNode()) // Thinking
     .addNode("code", createCodeNode()) // Thinking skipped if fastChanges
@@ -32,8 +30,7 @@ export default async function langgraphModify(
 
   workflow.addEdge(START, "searchQdrant");
   workflow.addEdge("searchQdrant", "searchNeo4j");
-  workflow.addEdge("searchNeo4j", "gatherFiles");
-  workflow.addEdge("gatherFiles", "combineContext");
+  workflow.addEdge("searchNeo4j", "combineContext");
   workflow.addEdge("think", "code");
   workflow.addEdge("code", "verify");
   workflow.addEdge("verify", "saveChanges");
