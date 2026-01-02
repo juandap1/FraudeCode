@@ -79,6 +79,18 @@ export class QdrantCli {
     }
   }
 
+  async deleteCollection(name: string) {
+    try {
+      await this.client.deleteCollection(name);
+      console.log(`Collection ${name} deleted.`);
+    } catch (err: any) {
+      if (err?.status !== 404) {
+        throw err;
+      }
+      console.log(`Collection ${name} usage not found (nothing to delete).`);
+    }
+  }
+
   async upsertCollections(collectionName: string, points: any[]) {
     await this.client.upsert(collectionName, {
       wait: true,

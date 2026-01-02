@@ -129,8 +129,11 @@ async function addBatch(
   let client = new QdrantCli();
   let neo4jClient = new Neo4jClient();
   await neo4jClient.healthCheck();
+  await neo4jClient.deleteAllNodes();
   await client.init();
+  await client.deleteCollection(repo.name);
   await client.getOrCreateCollection(repo.name);
   await indexAllFiles(repo, client, neo4jClient);
   console.log("Indexing finished.");
+  await neo4jClient.close();
 })();

@@ -23,6 +23,18 @@ export class Neo4jClient {
     }
   }
 
+  async deleteAllNodes() {
+    const session = this.driver.session();
+    try {
+      await session.run("MATCH (n) DETACH DELETE n");
+      console.log("All Neo4j nodes deleted.");
+    } catch (error) {
+      console.error("Error deleting all nodes:", error);
+    } finally {
+      await session.close();
+    }
+  }
+
   async addFileNode(filePath: string) {
     const session = this.driver.session();
     try {
