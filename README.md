@@ -60,6 +60,17 @@ docker-compose up -d
    bun run dev
    ```
 
+### MODELS
+
+| Model Name       | Size | Context Window | Speed (M2) | Notable Feature                    |
+| :--------------- | :--- | :------------- | :--------- | :--------------------------------- |
+| qwen2.5:0.5b     | 0.5B | 32K            | ~90 tok/s  | Lightning fast; edge-ready         |
+| qwen2.5-coder:7b | 7B   | 128K           | ~25 tok/s  | Best performance-to-speed for code |
+| llama3.1:latest  | 8B   | 128K           | ~18 tok/s  | Great balance of logic and utility |
+| mistral:latest   | 7B   | 32K            | ~22 tok/s  | Efficient for shorter interactions |
+| qwen3:8b         | 8B   | 128K           | ~15 tok/s  | Native thinking/reasoning mode     |
+| phi4:latest      | 14B  | 16K            | ~10 tok/s  | High-tier reasoning; slower on M2  |
+
 ## 🧰 Tech Stack
 
 - **Runtime**: [Bun](https://bun.sh/)

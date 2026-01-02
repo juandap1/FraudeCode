@@ -45,6 +45,7 @@ export const createCodeNode = () => {
       lastChunk = chunk;
       updateOutput("markdown", modifications, "Implementation Details");
     }
+    log("Coder modifications: ", modifications);
     let usage = null;
     if (lastChunk?.usage_metadata) {
       usage = lastChunk.usage_metadata;
