@@ -2,7 +2,7 @@ import * as fs from "fs";
 import type { AgentStateType } from "../../types/state";
 import { useFraudeStore } from "../../store/useFraudeStore";
 
-const { updateOutput } = useFraudeStore.getState();
+const { updateOutput, updateInteraction } = useFraudeStore.getState();
 export const createSaveChangesNode = (
   promptUserConfirmation: () => Promise<boolean>
 ) => {
@@ -10,6 +10,7 @@ export const createSaveChangesNode = (
     updateOutput("log", "Waiting for user confirmation");
 
     const confirmed = await promptUserConfirmation();
+    updateInteraction(state.id, { status: 1 });
 
     if (confirmed) {
       const changesToSave = state.pendingChanges || [];

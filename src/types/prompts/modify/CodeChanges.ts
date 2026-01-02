@@ -12,7 +12,8 @@ File Contents: ${codeContext}
 Instructions:
 1. Provide ONLY the targeted changes needed - do NOT rewrite entire files.
 2. For each file, specify which lines to ADD and which to REMOVE.
-3. Format your response exactly as follows:
+3. Make the minimum number of changes possible.
+4. Format your response exactly as follows:
 
 FILE: <path/to/file>
 AT LINE <line_number>:

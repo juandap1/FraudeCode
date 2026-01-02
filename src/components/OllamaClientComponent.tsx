@@ -3,13 +3,13 @@ import SelectInput from "ink-select-input";
 import type { OllamaCLI } from "../hooks/useOllamaClient";
 import LoaderComponent from "./LoaderComponent";
 import OutputRenderer from "./output/OutputRenderer";
-import { useInteraction } from "../store/useFraudeStore";
+import {
+  useInteraction,
+  useFraudeStore,
+  type SelectItem,
+} from "../store/useFraudeStore";
 import InputBoxComponent from "./InputBoxComponent";
-
-type SelectItem = {
-  label: string;
-  value: boolean;
-};
+import CommentComponent from "./CommentComponent";
 
 const OllamaClientComponent = ({
   OllamaClient,
@@ -22,10 +22,11 @@ const OllamaClientComponent = ({
   ];
 
   const handleConfirmationSelect = (item: SelectItem) => {
-    OllamaClient.confirmModification(item.value);
+    useFraudeStore.getState().resolveConfirmation(item.value);
   };
 
   const interaction = useInteraction(OllamaClient.interactionId);
+  const promptInfo = useFraudeStore((state) => state.promptInfo);
 
   if (!interaction) {
     return null;
@@ -38,28 +39,31 @@ const OllamaClientComponent = ({
         <OutputRenderer key={item.id} item={item} />
       ))}
 
-      {interaction.pendingConfirmation && (
+      {interaction.status === 3 && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold color="yellow">
-            Do you want to save these changes?
+            {promptInfo?.query || "Do you want to save these changes?"}
           </Text>
           <SelectInput
-            items={confirmationItems}
+            items={promptInfo?.options || confirmationItems}
             onSelect={handleConfirmationSelect}
           />
         </Box>
       )}
 
-      {interaction.status !== 0 && (
+      {interaction.status !== 0 && interaction.status !== 4 && (
         <LoaderComponent
+          id={interaction.interactionId}
           status={interaction.status}
           tokenUsage={interaction.tokenUsage}
           statusText={interaction.statusText}
         />
       )}
+      {interaction.status === 4 && <CommentComponent />}
       {interaction.status === 0 && (
         <InputBoxComponent OllamaClient={OllamaClient} />
       )}
+      {/* <Text>Status: {interaction.status}</Text> */}
     </Box>
   );
 };

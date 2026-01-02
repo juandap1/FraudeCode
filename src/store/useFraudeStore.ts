@@ -6,7 +6,9 @@ export type OutputItemType =
   | "markdown"
   | "diff"
   | "confirmation"
-  | "command";
+  | "command"
+  | "checkpoint"
+  | "comment";
 
 export interface TokenUsage {
   total: number;
@@ -24,13 +26,25 @@ export interface OutputItem {
 
 export interface InteractionState {
   interactionId: string;
-  status: number; // 0 = idle, 1 = loading, 2 = done, -1 = interrupted, 3 = awaiting confirmation
+  status: number; // 0 = idle, 1 = loading, 2 = done, -1 = interrupted, 3 = awaiting confirmation, 4 = awaiting implementation comment
   outputItems: OutputItem[];
   tokenUsage: TokenUsage;
   elapsedTime: number;
-  pendingConfirmation: boolean;
   pendingChanges: PendingChange[];
   statusText?: string;
+  lastBreak: number;
+  timeElapsed: number;
+}
+
+export type SelectItem = {
+  label: string;
+  value: any;
+};
+
+export interface PromptInfo {
+  query: string;
+  options?: SelectItem[];
+  selectedOption?: any;
 }
 
 interface FraudeStore {
@@ -40,6 +54,9 @@ interface FraudeStore {
   currentInteractionId: string | null;
   abortController: AbortController | null;
   history: string[];
+  executionMode: "Planning" | "Fast";
+  promptInfo: PromptInfo | null;
+  implementationComment: string | null;
   // Actions
   addInteraction: () => string;
   updateInteraction: (id: string, updates: Partial<InteractionState>) => void;
@@ -53,9 +70,16 @@ interface FraudeStore {
   ) => void;
   setStatus: (statusText: string | undefined, id?: string) => void;
   setCurrentInteraction: (id: string | null) => void;
-  promptUserConfirmation: (id?: string) => Promise<boolean>;
-  resolveConfirmation: (confirmed: boolean, id?: string) => void;
+  promptUserConfirmation: (
+    promptInfo?: PromptInfo,
+    id?: string
+  ) => Promise<boolean>;
+  resolveConfirmation: (confirmed: boolean) => void;
+  promptImplementationPlanCheck: (id?: string) => Promise<number>;
+  commentPromise: (id?: string) => Promise<string>;
+  resolveComment: (comment: string, id?: string) => void;
   addToHistory: (query: string) => void;
+  setExecutionMode: (mode: "Planning" | "Fast") => void;
 }
 
 export const useFraudeStore = create<FraudeStore>((set) => ({
@@ -65,6 +89,9 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
   currentInteractionId: null,
   abortController: null,
   history: [],
+  executionMode: "Fast",
+  promptInfo: null,
+  implementationComment: null,
   addInteraction: () => {
     const id = crypto.randomUUID();
     const newInteraction: InteractionState = {
@@ -73,9 +100,10 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
       outputItems: [],
       tokenUsage: { total: 0, prompt: 0, completion: 0 },
       elapsedTime: 0,
-      pendingConfirmation: false,
       pendingChanges: [],
       statusText: undefined,
+      lastBreak: 0,
+      timeElapsed: 0,
     };
     set((state) => ({
       interactions: { ...state.interactions, [id]: newInteraction },
@@ -127,7 +155,20 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
       if (!interaction) return state;
       const outputItems = [...interaction.outputItems];
       const latestOutput = outputItems[outputItems.length - 1];
-      if (latestOutput && latestOutput.type === type && type !== "log") {
+      let extraChanges = {};
+      if (type === "checkpoint") {
+        let elapsed = interaction.timeElapsed - interaction.lastBreak;
+        extraChanges = {
+          lastBreak: interaction.timeElapsed,
+        };
+        content += ` · (${(elapsed / 10).toFixed(1)}s)`;
+      }
+      if (
+        latestOutput &&
+        latestOutput.type === type &&
+        type !== "log" &&
+        type !== "checkpoint"
+      ) {
         outputItems[outputItems.length - 1] = {
           ...latestOutput,
           content,
@@ -147,6 +188,7 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
           ...state.interactions,
           [interactionId]: {
             ...interaction,
+            ...extraChanges,
             outputItems,
           },
         },
@@ -173,7 +215,7 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
 
   setCurrentInteraction: (id) => set({ currentInteractionId: id }),
 
-  promptUserConfirmation: (id) => {
+  promptUserConfirmation: (promptInfo?: PromptInfo, id?: string) => {
     return new Promise((resolve) => {
       const interactionId =
         id || useFraudeStore.getState().currentInteractionId;
@@ -186,11 +228,11 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
         const interaction = state.interactions[interactionId];
         if (!interaction) return state;
         return {
+          promptInfo,
           interactions: {
             ...state.interactions,
             [interactionId]: {
               ...interaction,
-              pendingConfirmation: true,
               status: 3,
             },
           },
@@ -199,20 +241,86 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
     });
   },
 
-  resolveConfirmation: (confirmed, id) => {
-    const interactionId = id || useFraudeStore.getState().currentInteractionId;
+  resolveConfirmation: (confirmed) => {
     if (confirmationResolver) {
       confirmationResolver(confirmed);
       confirmationResolver = null;
     }
-    if (interactionId) {
+  },
+
+  promptImplementationPlanCheck: (id?: string) => {
+    return new Promise((resolve) => {
+      const interactionId =
+        id || useFraudeStore.getState().currentInteractionId;
+      if (!interactionId) {
+        resolve(2);
+        return;
+      }
+      confirmationResolver = resolve;
+      set((state) => {
+        const interaction = state.interactions[interactionId];
+        if (!interaction) return state;
+        return {
+          promptInfo: {
+            query: "Do you want to proceed with this implementation plan?",
+            options: [
+              { value: 0, label: "Yes" },
+              { value: 1, label: "No (modify plan)" },
+              { value: 2, label: "No (cancel)" },
+            ],
+          },
+          interactions: {
+            ...state.interactions,
+            [interactionId]: {
+              ...interaction,
+              status: 3,
+            },
+          },
+        };
+      });
+    });
+  },
+
+  commentPromise: (id?: string) => {
+    return new Promise((resolve) => {
+      const interactionId =
+        id || useFraudeStore.getState().currentInteractionId;
+      if (!interactionId) {
+        resolve("");
+        return;
+      }
+      commentResolver = resolve;
       set((state) => {
         const interaction = state.interactions[interactionId];
         if (!interaction) return state;
         return {
           interactions: {
             ...state.interactions,
-            [interactionId]: { ...interaction, pendingConfirmation: false },
+            [interactionId]: {
+              ...interaction,
+              status: 4,
+            },
+          },
+        };
+      });
+    });
+  },
+
+  resolveComment: (comment: string, id?: string) => {
+    const interactionId = id || useFraudeStore.getState().currentInteractionId;
+    if (commentResolver) {
+      commentResolver(comment);
+      commentResolver = null;
+    }
+    if (interactionId) {
+      set((state) => {
+        const interaction = state.interactions[interactionId];
+        if (!interaction) return state;
+        return {
+          implementationComment: comment,
+          interactions: {
+            ...state.interactions,
+            [interactionId]: { ...interaction, status: 1 },
           },
         };
       });
@@ -229,16 +337,22 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
       return { history: newHistory };
     });
   },
+  setExecutionMode: (mode) => set({ executionMode: mode }),
 }));
 
-let confirmationResolver: ((confirmed: boolean) => void) | null = null;
+let confirmationResolver: ((selected: any) => void) | null = null;
+let commentResolver: ((comment: string) => void) | null = null;
 
-export const getInteraction = (id: string | null) => {
-  if (!id) return undefined;
+export const getInteraction = (id?: string | null) => {
+  if (!id) {
+    let interactionId = useFraudeStore.getState().currentInteractionId;
+    if (!interactionId) return undefined;
+    return useFraudeStore.getState().interactions[interactionId];
+  }
   return useFraudeStore.getState().interactions[id];
 };
 
-export const useInteraction = (id: string | null) => {
+export const useInteraction = (id?: string | null) => {
   if (!id)
     return useFraudeStore(
       (state) => state.interactions[state.interactionOrder.length - 1]

@@ -16,6 +16,7 @@ Instructions:
 1. Analyze which files need to be changed.
 2. Formulate a step-by-step plan for the modifications.
 3. Be precise about what logic needs to be updated.
+4. Make the minimum number of changes possible.
 
 Output your plan as a detailed technical specification. Begin immediately.
 `;

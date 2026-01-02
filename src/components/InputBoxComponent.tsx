@@ -3,6 +3,15 @@ import { useApp, Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import type { OllamaCLI } from "../hooks/useOllamaClient";
 import { useFraudeStore } from "../store/useFraudeStore";
+import { homedir } from "os";
+
+const shortenPath = (path: string) => {
+  const home = homedir();
+  if (path.startsWith(home)) {
+    return path.replace(home, "~");
+  }
+  return path;
+};
 
 const InputBoxComponent = ({ OllamaClient }: { OllamaClient: OllamaCLI }) => {
   const [value, setValue] = useState("");
@@ -34,7 +43,33 @@ const InputBoxComponent = ({ OllamaClient }: { OllamaClient: OllamaCLI }) => {
         setInputKey((k) => k + 1);
       }
     }
+
+    if (key.tab) {
+      const executionMode = useFraudeStore.getState().executionMode;
+      const newMode = executionMode === "Fast" ? "Planning" : "Fast";
+      useFraudeStore.setState({ executionMode: newMode });
+    }
   });
+
+  const handleChanges = (v: string) => {
+    setValue(v);
+    // Reset history index if user types something manual
+    if (historyIndex !== -1 && v !== history[historyIndex]) {
+      setHistoryIndex(-1);
+    }
+  };
+
+  const processSubmit = (v: string) => {
+    if (v.trim().toLowerCase() === "exit") {
+      exit();
+      return;
+    }
+    if (v.trim() === "") return;
+    addToHistory(v);
+    setValue("");
+    setHistoryIndex(-1);
+    OllamaClient.handleQuery(v);
+  };
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -45,25 +80,17 @@ const InputBoxComponent = ({ OllamaClient }: { OllamaClient: OllamaCLI }) => {
           <TextInput
             key={inputKey}
             value={value}
-            onChange={(v) => {
-              setValue(v);
-              // Reset history index if user types something manual
-              if (historyIndex !== -1 && v !== history[historyIndex]) {
-                setHistoryIndex(-1);
-              }
-            }}
-            onSubmit={(v) => {
-              if (v.trim().toLowerCase() === "exit") {
-                exit();
-                return;
-              }
-              addToHistory(v);
-              setValue("");
-              setHistoryIndex(-1);
-              OllamaClient.handleQuery(v);
-            }}
+            onChange={handleChanges}
+            onSubmit={processSubmit}
           />
         </Box>
+      </Box>
+      <Box width={70} justifyContent="space-between" paddingX={1}>
+        <Text color="gray">{shortenPath(process.cwd())}</Text>
+        <Text color="cyan">
+          <Text bold>{useFraudeStore.getState().executionMode}</Text> (Tab to
+          toggle)
+        </Text>
       </Box>
     </Box>
   );

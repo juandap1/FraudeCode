@@ -7,6 +7,7 @@ import {
   useFraudeStore,
   useInteraction,
   interrupt,
+  getInteraction,
 } from "../store/useFraudeStore";
 import log from "../utils/logger";
 
@@ -45,7 +46,11 @@ export default function App() {
       useFraudeStore.setState({ started: true });
       useFraudeStore.getState().addInteraction();
       log("App Started...");
-    } else if (key.escape || input === "\u001b") {
+    } else if (
+      (key.escape || input === "\u001b") &&
+      getInteraction()?.status !== 0 &&
+      getInteraction()?.status !== 4
+    ) {
       interrupt();
     }
   });

@@ -1,6 +1,7 @@
 import type { AgentStateType } from "../../types/state";
 import { useFraudeStore } from "../../store/useFraudeStore";
 import qdrant from "../../services/qdrant";
+import log from "../../utils/logger";
 
 const { updateOutput, setStatus } = useFraudeStore.getState();
 
@@ -24,6 +25,8 @@ export const createSearchQdrantNode = () => {
     }
 
     updateOutput("log", `Found ${filePaths.length} relevant files.`);
+    log("Found files: ", filePaths);
+    updateOutput("checkpoint", "Qdrant search complete");
 
     return {
       qdrantResults: searchResults || [],

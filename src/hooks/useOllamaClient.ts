@@ -16,8 +16,6 @@ import log from "../utils/logger";
 
 export interface OllamaCLI {
   handleQuery: (query: string) => Promise<void>;
-  confirmModification: (confirmed: boolean) => void;
-  pendingConfirmation: boolean;
   pendingChanges: PendingChange[];
   interactionId: string | null;
 }
@@ -29,7 +27,6 @@ export function useOllamaClient(initialId: string | null = null): OllamaCLI {
     updateInteraction,
     updateOutput,
     promptUserConfirmation,
-    resolveConfirmation,
   } = useFraudeStore();
 
   const interaction = useInteraction(interactionId);
@@ -72,17 +69,8 @@ export function useOllamaClient(initialId: string | null = null): OllamaCLI {
     [addInteraction, updateInteraction]
   );
 
-  const confirmModification = useCallback(
-    (confirmed: boolean) => {
-      resolveConfirmation(confirmed, interactionId || undefined);
-    },
-    [interactionId, resolveConfirmation]
-  );
-
   return {
     handleQuery,
-    confirmModification,
-    pendingConfirmation: interaction?.pendingConfirmation || false,
     pendingChanges: interaction?.pendingChanges || [],
     interactionId,
   };

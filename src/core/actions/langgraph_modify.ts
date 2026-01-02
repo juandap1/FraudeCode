@@ -6,7 +6,7 @@ import { createSearchQdrantNode } from "../nodes/searchQdrant";
 import { createSearchNeo4jNode } from "../nodes/searchNeo4j";
 import { createGatherFilesNode } from "../nodes/gatherFiles";
 import { createCombineContextNode } from "../nodes/combineContext";
-import { createThinkNode } from "../nodes/thinkModifications";
+import { createImplementationPlanNode } from "../nodes/implementationPlan";
 import { createCodeNode } from "../nodes/codeModifications";
 import { createVerifyNode } from "../nodes/verify";
 import { createSaveChangesNode } from "../nodes/saveChanges";
@@ -25,8 +25,8 @@ export default async function langgraphModify(
     .addNode("searchNeo4j", createSearchNeo4jNode())
     .addNode("gatherFiles", createGatherFilesNode())
     .addNode("combineContext", createCombineContextNode())
-    .addNode("think", createThinkNode())
-    .addNode("code", createCodeNode())
+    .addNode("think", createImplementationPlanNode()) // Thinking
+    .addNode("code", createCodeNode()) // Thinking skipped if fastChanges
     .addNode("verify", createVerifyNode())
     .addNode("saveChanges", createSaveChangesNode(promptUserConfirmation));
 
@@ -34,11 +34,21 @@ export default async function langgraphModify(
   workflow.addEdge("searchQdrant", "searchNeo4j");
   workflow.addEdge("searchNeo4j", "gatherFiles");
   workflow.addEdge("gatherFiles", "combineContext");
-  workflow.addEdge("combineContext", "think");
   workflow.addEdge("think", "code");
   workflow.addEdge("code", "verify");
   workflow.addEdge("verify", "saveChanges");
   workflow.addEdge("saveChanges", END);
+  // Execution mode pathing
+  workflow.addConditionalEdges(
+    "combineContext",
+    () => {
+      return useFraudeStore.getState().executionMode;
+    },
+    {
+      Fast: "code",
+      Planning: "think",
+    }
+  );
 
   const app = workflow.compile();
 

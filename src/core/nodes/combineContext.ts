@@ -20,6 +20,7 @@ export const createCombineContextNode = () => {
         } (${structuralContextSize} chars)\n` +
         "✅ Context gathering complete."
     );
+    updateOutput("checkpoint", "Combined context");
 
     return {
       status: "context_gathered",

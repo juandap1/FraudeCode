@@ -1,38 +1,56 @@
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
-import type { TokenUsage } from "../store/useFraudeStore";
+import {
+  useFraudeStore,
+  useInteraction,
+  type TokenUsage,
+} from "../store/useFraudeStore";
+const { updateInteraction } = useFraudeStore.getState();
 
 const LoaderComponent = ({
+  id,
   status,
   tokenUsage,
   statusText,
 }: {
+  id: string;
   status: number;
   tokenUsage: TokenUsage;
   statusText?: string;
 }) => {
   const [i, setFrame] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
-  const [interval, editInterval] = useState<NodeJS.Timeout | null>(null);
   const frames = (text: string) => [
     `·  ${text}.  `,
     `•  ${text}.. `,
     `●  ${text}...`,
   ];
 
+  const interaction = useInteraction(id);
+  const elapsed = interaction?.timeElapsed || 0;
+
   useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+
     if (status === 1) {
-      editInterval(
-        setInterval(() => {
-          setFrame((prevIndex) => (prevIndex + 1) % 3);
-          setElapsed((prev) => prev + 1);
-        }, 100)
-      );
-    } else {
-      if (interval != null) clearInterval(interval);
-      editInterval(null);
+      timer = setInterval(() => {
+        setFrame((prevIndex) => (prevIndex + 1) % 3);
+
+        // Use getState() to avoid stale closure and get the most recent timeElapsed
+        const currentInteraction = useFraudeStore.getState().interactions[id];
+        const currentElapsed = currentInteraction?.timeElapsed || 0;
+
+        updateInteraction(id, {
+          timeElapsed: currentElapsed + 1,
+        });
+      }, 100);
     }
-  }, [status]);
+
+    return () => {
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
+  }, [status, id]);
 
   const currentStatusText = statusText || "Pondering";
   const currentFrames = frames(currentStatusText);

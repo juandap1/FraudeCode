@@ -3,18 +3,31 @@ import type { AgentStateType } from "../../types/state";
 import ModificationCodeChangesPrompt from "../../types/prompts/modify/CodeChanges";
 import { useFraudeStore } from "../../store/useFraudeStore";
 import { generalModel } from "../../services/llm";
+import FastCodeChangesPrompt from "../../types/prompts/modify/FastChanges";
+import log from "../../utils/logger";
 
 const { updateOutput, setStatus } = useFraudeStore.getState();
 
 export const createCodeNode = () => {
   return async (state: AgentStateType, config?: any) => {
     setStatus("Generating code changes (llama3.1:latest)");
+    let prompt = null;
 
-    const prompt = ModificationCodeChangesPrompt(
-      state.codeContext,
-      state.thinkingProcess,
-      state.query
-    );
+    if (useFraudeStore.getState().executionMode === "Planning") {
+      prompt = ModificationCodeChangesPrompt(
+        state.codeContext,
+        state.thinkingProcess,
+        state.query
+      );
+    } else {
+      prompt = FastCodeChangesPrompt(
+        state.codeContext,
+        state.structuralContext,
+        state.query
+      );
+    }
+
+    log("Coder prompt: ", prompt);
 
     const promptSize = prompt.length;
     updateOutput("log", `Coder prompt size: ${promptSize} characters`);
@@ -32,8 +45,10 @@ export const createCodeNode = () => {
       lastChunk = chunk;
       updateOutput("markdown", modifications, "Implementation Details");
     }
+    log("Coder modifications: ", modifications);
+    let usage = null;
     if (lastChunk?.usage_metadata) {
-      const usage = lastChunk.usage_metadata;
+      usage = lastChunk.usage_metadata;
 
       useFraudeStore.getState().updateTokenUsage({
         total: usage.total_tokens,
@@ -41,7 +56,10 @@ export const createCodeNode = () => {
         completion: usage.output_tokens,
       });
     }
-    // setStatus("Implementation complete.");
+    updateOutput(
+      "checkpoint",
+      `Generated code changes [${usage?.output_tokens} tokens]`
+    );
 
     return {
       modifications,

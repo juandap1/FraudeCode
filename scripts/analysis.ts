@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import path from "path";
-import QdrantCli from "../src/services/qdrant";
-import Neo4jClient from "../src/services/neo4j";
+import { QdrantCli } from "../src/services/qdrant";
+import { Neo4jClient } from "../src/services/neo4j";
 import type { GitRepo, Chunk } from "../src/types/analysis";
 import { walkRepo } from "../src/utils/FileScanner";
 import { analyzeCode } from "../src/core/analysis/CodeAnalyzer";

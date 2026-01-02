@@ -6,6 +6,7 @@ const { updateOutput, setStatus } = useFraudeStore.getState();
 export const createSearchNeo4jNode = () => {
   return async (state: AgentStateType) => {
     setStatus("Searching Neo4j for structural context");
+    // Update search query to maybe use filePaths from qdrant search
 
     const words = state.query.split(/\W+/);
     let structuralContext = "";
@@ -31,6 +32,7 @@ export const createSearchNeo4jNode = () => {
           : "No structural context found."
       }`
     );
+    updateOutput("checkpoint", "Neo4j search complete");
 
     return {
       structuralContext,
