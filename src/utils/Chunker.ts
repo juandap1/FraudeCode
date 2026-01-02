@@ -5,10 +5,26 @@ const MAX_TOKENS = 8192;
 export async function split(src: string, startLine: number): Promise<Chunk[]> {
   if (!src.trim()) return [];
   const lines = src.split("\n");
+
+  // Trim trailing empty lines from the source lines
+  while (lines.length > 0 && lines[lines.length - 1]?.trim() === "") {
+    lines.pop();
+  }
+
+  // Trim leading empty lines
+  let leadingEmptyCount = 0;
+  while (lines.length > 0 && lines[0]?.trim() === "") {
+    lines.shift();
+    leadingEmptyCount++;
+  }
+
+  if (lines.length === 0) return [];
+
   const NEW_LINE_TOKEN = "\n";
   let currentLines: string[] = [];
   let currentTokens = 0;
-  let splitStart = startLine;
+  // Adjust startLine by the number of removed leading lines
+  let splitStart = startLine + leadingEmptyCount;
   const splits: Chunk[] = [];
 
   const flush = () => {
@@ -16,7 +32,7 @@ export async function split(src: string, startLine: number): Promise<Chunk[]> {
       id: crypto.randomUUID(),
       document: currentLines.join("\n"),
       startLine: splitStart,
-      endLine: splitStart + currentLines.length,
+      endLine: splitStart + currentLines.length - 1,
     });
   };
 

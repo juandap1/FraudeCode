@@ -65,7 +65,7 @@ export async function analyzeCode(
   wantedNodes.sort((a, b) => a.startIndex - b.startIndex);
 
   let cursor = 0;
-  let line = tree.rootNode.startPosition.row;
+  let line = tree.rootNode.startPosition.row + 1;
 
   for (const node of wantedNodes) {
     // 1. Definition Info
@@ -107,7 +107,7 @@ export async function analyzeCode(
 
     const nodeContent = code.slice(node.startIndex, node.endIndex);
     const nodeLine = node.startPosition.row;
-    const nodeSplits = await split(nodeContent, nodeLine);
+    const nodeSplits = await split(nodeContent, nodeLine + 1);
     chunks.push(
       ...nodeSplits.map((n) => {
         return {
@@ -119,7 +119,7 @@ export async function analyzeCode(
     );
 
     cursor = node.endIndex;
-    line = node.endPosition.row;
+    line = node.endPosition.row + 1;
   }
 
   if (cursor < code.length) {
