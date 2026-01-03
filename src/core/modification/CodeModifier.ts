@@ -17,6 +17,7 @@ export const applyTargetedChanges = (
   const blocksByFile: Record<string, string[]> = {};
   for (const block of fileBlocks) {
     const blockLines = block.split(/\r?\n/);
+    if (blockLines[1]?.trim().startsWith("NO CHANGES")) continue;
     const filePath = blockLines[0]
       ?.trim()
       .replace(/\*+$/, "")
