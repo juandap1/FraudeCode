@@ -82,11 +82,7 @@ export const createImplementationPlanNode = () => {
   return async (state: AgentStateType, config?: any) => {
     setStatus("Analyzing requirements (qwen3:8b)");
 
-    const prompt = ModificationThinkPrompt(
-      state.structuralContext,
-      state.codeContext,
-      state.query
-    );
+    const prompt = ModificationThinkPrompt(state.codeContext, state.query);
 
     const promptSize = prompt.length;
     updateOutput("log", `Thinker prompt size: ${promptSize} characters`);

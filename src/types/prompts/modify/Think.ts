@@ -1,13 +1,8 @@
 // ModificationThinkPrompt.ts
 // v1
-const ModificationThinkPrompt = (
-  structuralContext: string,
-  codeContext: string,
-  query: string
-) => `
+const ModificationThinkPrompt = (codeContext: string, query: string) => `
 You are an expert software engineer. Your task is to plan how to modify the code in the project based on the user's request.
 Context:
-Structural Context: ${structuralContext}
 File Contents: ${codeContext}
 
 User Request: "${query}"

@@ -4,7 +4,7 @@ import ModificationCodeChangesPrompt from "../../types/prompts/modify/CodeChange
 import { useFraudeStore } from "../../store/useFraudeStore";
 import { generalModel } from "../../services/llm";
 // import FastCodeChangesPrompt from "../../types/prompts/modify/FastChanges";
-import FastCodeChangesPrompt2 from "../../types/prompts/modify/FastChanges2";
+import FastCodeChangesPrompt2 from "../../types/prompts/modify/FastChangesv2";
 import log from "../../utils/logger";
 
 const { updateOutput, setStatus } = useFraudeStore.getState();
