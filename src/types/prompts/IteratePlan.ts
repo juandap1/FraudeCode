@@ -4,27 +4,41 @@ const generateIterationPrompt = (
   currentPlan: string,
   feedback: string
 ) => `
-You are an expert software engineer. Your task is to correct the base plan based on the user's change request.
+You are an expert software engineer. Your task is to plan how to modify the BASE PLAN based on the user's change request.
 
-### REFERENCE DATA
-- **Original Goal:** ${originalQuery}
-- **Code Context:** \`\`\`
-${codeContext}
-\`\`\`
+<User Request>
+${originalQuery}
+</User Request>
 
-### BASE PLAN
-${currentPlan}
-
-### CHANGE REQUEST
+<CHANGE_REQUEST>
 ${feedback}
+</CHANGE_REQUEST>
 
-### INSTRUCTIONS FOR OUTPUT
-1. Analyze original goal and base plan
-2. Analyze change request
-3. Modify base plan to address change request, while maintaining original goal
-4. Make the minimum number of changes possible
+<TARGET_CODE>
+${codeContext}
+</TARGET_CODE>
 
-Output your plan as a detailed technical specification. Begin immediately.
+<BASE_PLAN>
+${currentPlan}
+</BASE_PLAN>
+
+### Constraints:
+- Output ONLY the implementation plan. No conversational filler.
+- Each file must be handled in its own section. Never repeat a FILE header.
+- **ATOMIC STEPS**: Each task must be a complete, self-contained functional change. Do not split "defining a function" and "writing the body" into separate tasks.
+- Include instructions on where to place the code.
+- **SNIPPETS**: Include the exact code block or logic within the task description.
+
+### Output Format:
+FILE: [path/to/file]
+- [ ] TASK: [Complete functional change description + code snippet]
+---
+FILE: [next/file/path]
+...
+
+IMPORTANT: If a file is not modified, DO NOT include it in the output.
+
+INSTRUCTIONS START HERE:
 `;
 
 export default generateIterationPrompt;

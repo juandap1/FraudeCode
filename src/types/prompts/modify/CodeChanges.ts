@@ -3,56 +3,30 @@ const ModificationCodeChangesPrompt = (
   thinkingProcess: string,
   query: string
 ) => `
-You are an expert software engineer. Your task is to implement ONLY the necessary modifications to the project.
+You are a code modification engine. Your job is to list out the ADD OR REMOVE patches needed to complete the provided task
 
-User Request: "${query}"
-Plan: ${thinkingProcess}
-File Contents: ${codeContext}
+ONLY DO WHAT THE TASK ASKS YOU TO DO. DO NOT ADD ANYTHING ELSE.
 
-Instructions:
-1. Provide ONLY the targeted changes needed - do NOT rewrite entire files.
-2. For each file, specify which lines to ADD and which to REMOVE.
-3. Make the minimum number of changes possible.
-4. Format your response exactly as follows:
+ONLY OUTPUT THE ADD OR REMOVE PATCHES. DO NOT EXPLAIN OR COMMENT ON THE PATCHES.
+
+<TASK>
+${thinkingProcess}
+</TASK>
+
+<TARGET_CODE>
+${codeContext}
+</TARGET_CODE>
+
+OUTPUT FORMAT (EXACT):
 
 FILE: <path/to/file>
 AT LINE <line_number>:
-REMOVE:
+<PATCH_TYPE>:
 \`\`\`<language>
-<lines to remove - exact content>
-\`\`\`
-ADD:
-\`\`\`<language>
-<lines to add - replacement content>
+<exact code to add or remove>
 \`\`\`
 
-Example for adding a new import and modifying a function:
-
-FILE: sample/utils.py
-AT LINE 1:
-ADD:
-\`\`\`python
-import new_module
-\`\`\`
-
-AT LINE 15:
-REMOVE:
-\`\`\`python
-def old_function():
-    return "old"
-\`\`\`
-ADD:
-\`\`\`python
-def new_function():
-    return "new"
-\`\`\`
-
-IMPORTANT:
-- Only include lines that actually change
-- Use ONE block per logical change (e.g., adding an entire function should be one block, not multiple AT LINE instructions)
-- Include enough context in REMOVE to uniquely identify the location
-- If only adding (no removal), specify the line number where the addition should start
-- If only removing (no addition), omit the ADD block
+START LISTING PATHCES HERE:
 `;
 
 export default ModificationCodeChangesPrompt;

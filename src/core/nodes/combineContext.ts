@@ -151,17 +151,18 @@ export const createCombineContextNode = () => {
     //     }));
     //   })
     // );
-
+    let mappedContext: Record<string, string> = {};
     const codeContext =
       Object.entries(organizedPayloads)
         .map(([filePath, payloads]) => {
-          return (
+          let context =
             "FILE: " +
             filePath +
             "\n" +
             "CODE:\n" +
-            skeletonCode(payloads, importantCodeIds)
-          );
+            skeletonCode(payloads, importantCodeIds);
+          mappedContext[filePath] = context;
+          return context;
         })
         .join("\n\n") + "\n\n";
 
@@ -170,6 +171,7 @@ export const createCombineContextNode = () => {
     return {
       dependencies,
       codeContext,
+      mappedContext,
       status: "context_gathered",
     };
   };

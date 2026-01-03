@@ -18,6 +18,7 @@ export const AgentState = Annotation.Root({
   structuralContext: Annotation<any[]>(),
   dependencies: Annotation<string>(),
   codeContext: Annotation<string>(),
+  mappedContext: Annotation<Record<string, string>>(),
   thinkingProcess: Annotation<string>(),
   modifications: Annotation<string>(),
   diffs: Annotation<string>(),
