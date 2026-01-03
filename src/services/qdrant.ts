@@ -1,5 +1,6 @@
 import { QdrantClient } from "@qdrant/js-client-rest";
 import { pipeline } from "@huggingface/transformers";
+import log from "../utils/logger";
 
 const OLLAMA_EMBED_URL =
   process.env.OLLAMA_EMBED_URL || "http://localhost:11434/api/embeddings";
@@ -104,6 +105,28 @@ export class QdrantCli {
       limit: 3,
       with_payload: true,
     });
+  }
+
+  async getFileChunks(collectionName: string, filePath: string) {
+    const query = {
+      limit: 100, // increase or paginate if needed
+      with_payload: true,
+      with_vector: false,
+      // order_by: {
+      //   key: "startLine",
+      //   direction: "asc",
+      // },
+      filter: {
+        must: [
+          {
+            key: "filePath",
+            match: { value: filePath },
+          },
+        ],
+      },
+    };
+    const results = await this.client.scroll(collectionName, query);
+    return results.points;
   }
 
   async embed(text: string): Promise<number[]> {

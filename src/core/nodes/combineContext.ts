@@ -1,6 +1,8 @@
 import type { AgentStateType } from "../../types/state";
 import { useFraudeStore } from "../../store/useFraudeStore";
 import type { QdrantPayload } from "../../types/analysis";
+import qdrant from "../../services/qdrant";
+import log from "../../utils/logger";
 
 const { updateOutput, setStatus } = useFraudeStore.getState();
 
@@ -12,31 +14,76 @@ const indexCode = (content: string, startingLine: number) => {
   return contentWithLineNumbers;
 };
 
-const organizePayloadsByFileAndLine = (searchResults: any[]) => {
-  const files: Record<string, QdrantPayload[]> = {};
+// const organizePayloadsByFileAndLine = (searchResults: any[]) => {
+//   const files: Record<string, QdrantPayload[]> = {};
 
-  for (const result of searchResults) {
-    const payload: QdrantPayload = result.payload;
-    if (!payload?.filePath) continue;
+//   for (const result of searchResults) {
+//     const payload: QdrantPayload = result.payload;
+//     if (!payload?.filePath) continue;
 
-    if (!files[payload.filePath]) {
-      files[payload.filePath] = [];
+//     if (!files[payload.filePath]) {
+//       files[payload.filePath] = [];
+//     }
+
+//     files[payload.filePath]?.push(payload);
+//   }
+
+//   // Sort each file's payloads by line number
+//   for (const filePath in files) {
+//     files[filePath]?.sort((a, b) => {
+//       if (a.startLine !== b.startLine) {
+//         return a.startLine - b.startLine;
+//       }
+//       return (a.endLine ?? a.startLine) - (b.endLine ?? b.startLine);
+//     });
+//   }
+
+//   return files;
+// };
+
+const skeletonCode = (payloads: any[], ids: Set<string>) => {
+  if (!payloads.length) return "";
+
+  // Sort payloads by startLine, then by endLine (descending)
+  const sortedPayloads = [...payloads].sort((a, b) => {
+    if (a.startLine !== b.startLine) {
+      return a.startLine - b.startLine;
+    }
+    return (b.endLine ?? b.startLine) - (a.endLine ?? a.startLine);
+  });
+
+  let code = "";
+  let lastEndLine = 0;
+
+  for (const payload of sortedPayloads) {
+    const start = payload.startLine;
+    const end = payload.endLine ?? start;
+
+    // If this payload is behind our current line, it's a nested chunk we've already covered
+    if (start <= lastEndLine) {
+      continue;
     }
 
-    files[payload.filePath]?.push(payload);
-  }
+    // Gap between chunks
+    if (start > lastEndLine + 1) {
+      const gapStart = lastEndLine + 1;
+      const gapEnd = start - 1;
+      code += `${gapStart}${
+        gapEnd > gapStart ? ` - ${gapEnd}` : ""
+      }: [EMPTY LINES]\n`;
+    }
 
-  // Sort each file's payloads by line number
-  for (const filePath in files) {
-    files[filePath]?.sort((a, b) => {
-      if (a.startLine !== b.startLine) {
-        return a.startLine - b.startLine;
-      }
-      return (a.endLine ?? a.startLine) - (b.endLine ?? b.startLine);
-    });
-  }
+    if (ids.has(payload.id)) {
+      code += indexCode(payload.rawDocument, start);
+    } else {
+      const firstLine = payload.rawDocument.split("\n")[0];
+      code += `${start} - ${end}: ${firstLine} ...`;
+    }
+    code += "\n";
 
-  return files;
+    lastEndLine = end;
+  }
+  return code;
 };
 
 export const createCombineContextNode = () => {
@@ -60,9 +107,51 @@ export const createCombineContextNode = () => {
     });
     const dependencies = dependenciesList.join("\n\n") + "\n\n";
 
-    const organizedPayloads = organizePayloadsByFileAndLine(
-      state.qdrantResults
-    );
+    // const organizedPayloads = organizePayloadsByFileAndLine(
+    //   state.qdrantResults
+    // );
+    // const codeContext =
+    //   Object.entries(organizedPayloads)
+    //     .map(async ([filePath, payloads]) => {
+    //       return (
+    //         "FILE: " +
+    //         filePath +
+    //         "\n" +
+    //         "CODE:\n" +
+    //         payloads
+    //           .map((p) => indexCode(p.rawDocument, p.startLine))
+    //           .join("\n")
+    //       );
+    //     })
+    //     .join("\n\n") + "\n\n";
+
+    const importantCodeIds: Set<string> = new Set();
+    const files: Set<string> = new Set();
+    state.qdrantResults.forEach((x) => {
+      importantCodeIds.add(x.id);
+      files.add(x.payload.filePath);
+    });
+    log("files: ", files);
+    let organizedPayloads: Record<string, any[]> = {};
+    for (const filePath of Array.from(files)) {
+      log("filePath: ", filePath);
+      const fileChunks = await qdrant.getFileChunks(state.repoName, filePath);
+      log("fileChunks: ", JSON.stringify(fileChunks, null, 2));
+      organizedPayloads[filePath] = fileChunks.map((x) => ({
+        id: x.id,
+        ...x.payload,
+      }));
+    }
+    // await Promise.all(
+    //   Array.from(files).map(async (filePath: string) => {
+    //     const fileChunks = await qdrant.getFileChunks("functions", filePath);
+    //     organizedPayloads[filePath] = fileChunks.map((x) => ({
+    //       id: x.id,
+    //       ...x.payload,
+    //     }));
+    //   })
+    // );
+
     const codeContext =
       Object.entries(organizedPayloads)
         .map(([filePath, payloads]) => {
@@ -71,9 +160,7 @@ export const createCombineContextNode = () => {
             filePath +
             "\n" +
             "CODE:\n" +
-            payloads
-              .map((p) => indexCode(p.rawDocument, p.startLine))
-              .join("\n")
+            skeletonCode(payloads, importantCodeIds)
           );
         })
         .join("\n\n") + "\n\n";
