@@ -1,5 +1,5 @@
 import { StateGraph, END, START } from "@langchain/langgraph";
-import { AgentState, type AgentStateType } from "../../types/state";
+import { ModifierState, type ModifierStateType } from "../../types/state";
 
 // Nodes
 import { createSearchQdrantNode } from "../nodes/searchQdrant";
@@ -20,7 +20,7 @@ export default async function langgraphModify(
   const repoName = "sample";
   const repoPath = "/Users/mbranni03/Documents/GitHub/FraudeCode/sample";
 
-  const workflow = new StateGraph(AgentState)
+  const workflow = new StateGraph(ModifierState)
     .addNode("searchQdrant", createSearchQdrantNode())
     .addNode("searchNeo4j", createSearchNeo4jNode())
     .addNode("combineContext", createCombineContextNode())
@@ -39,7 +39,7 @@ export default async function langgraphModify(
   workflow.addEdge("updateRag", END);
   workflow.addConditionalEdges(
     "saveChanges",
-    (state: AgentStateType) => {
+    (state: ModifierStateType) => {
       if (state.userConfirmed) {
         return "updateRag";
       }

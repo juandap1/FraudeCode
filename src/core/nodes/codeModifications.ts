@@ -1,5 +1,5 @@
 import { HumanMessage } from "@langchain/core/messages";
-import type { AgentStateType } from "../../types/state";
+import type { ModifierStateType } from "../../types/state";
 import ModificationCodeChangesPrompt from "../../types/prompts/modify/CodeChanges";
 import { useFraudeStore } from "../../store/useFraudeStore";
 import { generalModel } from "../../services/llm";
@@ -76,7 +76,7 @@ const generateModifications = async (prompt: any[], signal?: AbortSignal) => {
 };
 
 export const createCodeNode = () => {
-  return async (state: AgentStateType, config?: any) => {
+  return async (state: ModifierStateType, config?: any) => {
     log("Coder state: ", JSON.stringify(state, null, 2));
     setStatus("Generating code changes (llama3.1:latest)");
     let prompt = null;

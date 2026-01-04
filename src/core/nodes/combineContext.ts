@@ -1,4 +1,4 @@
-import type { AgentStateType } from "../../types/state";
+import type { ModifierStateType } from "../../types/state";
 import { useFraudeStore } from "../../store/useFraudeStore";
 import type { QdrantPayload } from "../../types/analysis";
 import qdrant from "../../services/qdrant";
@@ -87,7 +87,7 @@ const skeletonCode = (payloads: any[], ids: Set<string>) => {
 };
 
 export const createCombineContextNode = () => {
-  return async (state: AgentStateType) => {
+  return async (state: ModifierStateType) => {
     setStatus("Combining context");
 
     const dependenciesList = state.structuralContext.map((s) => {
@@ -172,7 +172,6 @@ export const createCombineContextNode = () => {
       dependencies,
       codeContext,
       mappedContext,
-      status: "context_gathered",
     };
   };
 };

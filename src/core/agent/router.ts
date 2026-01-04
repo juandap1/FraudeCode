@@ -9,20 +9,17 @@ import { type DynamicStructuredTool } from "@langchain/core/tools";
 import { generalModel, scoutModel } from "../../services/llm";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { useFraudeStore } from "../../store/useFraudeStore";
+import { RouterState, type RouterStateType } from "../../types/state";
 import log from "../../utils/logger";
-
-interface RouterState {
-  messages: BaseMessage[];
-}
 
 const { setStatus, updateTokenUsage, updateOutput } = useFraudeStore.getState();
 
 export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
   const modelWithTools = generalModel.bindTools(tools);
 
-  const toolNode = new ToolNode<RouterState>(tools);
+  const toolNode = new ToolNode<RouterStateType>(tools);
 
-  const classifyIntent = async (state: RouterState) => {
+  const classifyIntent = async (state: RouterStateType) => {
     setStatus("Analyzing request");
     const lastMessage = state.messages[state.messages.length - 1];
     if (!lastMessage) return "general";
@@ -50,7 +47,7 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
     return decision.includes("project") ? "project" : "general";
   };
 
-  const callModel = async (state: RouterState, config?: any) => {
+  const callModel = async (state: RouterStateType, config?: any) => {
     setStatus("Thinking");
     const messages = state.messages;
     log("CallModel messages count: ", messages.length);
@@ -82,7 +79,7 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
     return { messages: [response] };
   };
 
-  const callGeneralModel = async (state: RouterState, config?: any) => {
+  const callGeneralModel = async (state: RouterStateType, config?: any) => {
     setStatus("Pondering");
     const { messages } = state;
     let fullResponse: any = null;
@@ -108,7 +105,7 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
     return { messages: [fullResponse] };
   };
 
-  const shouldContinue = (state: RouterState) => {
+  const shouldContinue = (state: RouterStateType) => {
     const { messages } = state;
     const lastMessage = messages[messages.length - 1];
     if (!lastMessage) return END;
@@ -133,14 +130,7 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
     return END;
   };
 
-  const workflow = new StateGraph<RouterState>({
-    channels: {
-      messages: {
-        value: (x: BaseMessage[], y: BaseMessage[]) => x.concat(y),
-        default: () => [],
-      },
-    },
-  })
+  const workflow = new StateGraph(RouterState)
     .addNode("project", callModel)
     .addNode("general", callGeneralModel)
     .addNode("tools", toolNode)
@@ -154,7 +144,7 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
     })
     .addConditionalEdges(
       "tools",
-      (state: RouterState) => {
+      (state: RouterStateType) => {
         const lastMessage = state.messages[state.messages.length - 1];
         if (
           lastMessage instanceof ToolMessage &&

@@ -1,15 +1,16 @@
 import type Neo4jClient from "../../services/neo4j";
-import { AgentState } from "../../types/state";
+import { SummaryState } from "../../types/state";
 import { StateGraph, END, START } from "@langchain/langgraph";
 import { createGetProjectStructureNode } from "../nodes/getProjectStructure";
 import { createSearchQdrantNode } from "../nodes/searchQdrant";
 import { createSummarizeNode } from "../nodes/summarize";
+import { useFraudeStore } from "../../store/useFraudeStore";
 
 export default async function summarizeProject(signal?: AbortSignal) {
   const repoName = "sample";
   const repoPath = "/Users/mbranni03/Documents/GitHub/FraudeCode/sample";
 
-  const workflow = new StateGraph(AgentState)
+  const workflow = new StateGraph(SummaryState)
     .addNode("getProjectStructure", createGetProjectStructureNode())
     .addNode("searchQdrant", createSearchQdrantNode())
     .addNode("summarize", createSummarizeNode());
@@ -24,12 +25,11 @@ export default async function summarizeProject(signal?: AbortSignal) {
   const app = workflow.compile();
   const finalState = (await app.invoke(
     {
+      id: useFraudeStore.getState().currentInteractionId || "",
       query,
       repoName,
       repoPath,
       status: "started",
-      pendingChanges: [],
-      userConfirmed: false,
     },
     { signal }
   )) as any;

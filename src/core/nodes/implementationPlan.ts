@@ -1,4 +1,4 @@
-import type { AgentStateType } from "../../types/state";
+import type { ModifierStateType } from "../../types/state";
 import ModificationThinkPrompt from "../../types/prompts/modify/Think";
 import { interrupt, useFraudeStore } from "../../store/useFraudeStore";
 import { thinkerModel } from "../../services/llm";
@@ -10,7 +10,7 @@ const { updateOutput, setStatus, updateInteraction } =
 
 const iterationLoop = async (
   plan: string,
-  state: AgentStateType,
+  state: ModifierStateType,
   config?: any
 ) => {
   let approved = false;
@@ -78,7 +78,7 @@ const think = async (prompt: any[], signal?: AbortSignal) => {
 };
 
 export const createImplementationPlanNode = () => {
-  return async (state: AgentStateType, config?: any) => {
+  return async (state: ModifierStateType, config?: any) => {
     setStatus("Analyzing requirements (qwen3:8b)");
 
     const prompt = ModificationThinkPrompt(state.codeContext, state.query);

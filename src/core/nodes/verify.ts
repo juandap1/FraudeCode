@@ -1,11 +1,11 @@
-import type { AgentStateType, PendingChange } from "../../types/state";
+import type { ModifierStateType, PendingChange } from "../../types/state";
 import { applyTargetedChanges } from "../../utils/CodeModifier";
 import { useFraudeStore } from "../../store/useFraudeStore";
 
 const { updateOutput, updateInteraction, setStatus } =
   useFraudeStore.getState();
 export const createVerifyNode = () => {
-  return async (state: AgentStateType) => {
+  return async (state: ModifierStateType) => {
     setStatus("Computing changes");
 
     const pendingChanges = applyTargetedChanges(

@@ -1,11 +1,11 @@
-import type { AgentStateType } from "../../types/state";
 import summarizePrompt from "../../types/prompts/Summarize";
 import { useFraudeStore } from "../../store/useFraudeStore";
 import { generalModel } from "../../services/llm";
+import type { SummaryStateType } from "../../types/state";
 
 const { updateOutput, setStatus } = useFraudeStore.getState();
 export const createSummarizeNode = () => {
-  return async (state: AgentStateType, config?: any) => {
+  return async (state: SummaryStateType, config?: any) => {
     setStatus("Generating summary (llama3.1:latest)");
 
     let codeContext = "";
@@ -18,8 +18,7 @@ export const createSummarizeNode = () => {
     //   // 3. Synthesize summary
     const prompt = summarizePrompt(
       state.repoName,
-      // state.structuralContext,
-      "",
+      state.structuralContext,
       codeContext
     );
 
@@ -51,7 +50,6 @@ export const createSummarizeNode = () => {
     // setStatus("Implementation complete.");
 
     return {
-      summary,
       status: "summary_generated",
     };
   };

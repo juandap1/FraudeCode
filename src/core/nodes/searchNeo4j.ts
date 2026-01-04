@@ -1,11 +1,11 @@
-import type { AgentStateType } from "../../types/state";
+import type { ModifierStateType } from "../../types/state";
 import { useFraudeStore } from "../../store/useFraudeStore";
 import neo4jClient from "../../services/neo4j";
 import log from "../../utils/logger";
 
 const { updateOutput, setStatus } = useFraudeStore.getState();
 export const createSearchNeo4jNode = () => {
-  return async (state: AgentStateType) => {
+  return async (state: ModifierStateType) => {
     setStatus("Searching Neo4j for structural context");
 
     const symbols: { symbol: string; filePath: string }[] = [];
