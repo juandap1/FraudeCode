@@ -1,4 +1,3 @@
-import { HumanMessage } from "@langchain/core/messages";
 import type { AgentStateType } from "../../types/state";
 import ModificationThinkPrompt from "../../types/prompts/modify/Think";
 import { interrupt, useFraudeStore } from "../../store/useFraudeStore";
@@ -52,9 +51,9 @@ const iterationLoop = async (
   return { approved: true, plan };
 };
 
-const think = async (prompt: string, signal?: AbortSignal) => {
+const think = async (prompt: any[], signal?: AbortSignal) => {
   let thinkingProcess = "";
-  const stream = await thinkerModel.stream([new HumanMessage(prompt)], {
+  const stream = await thinkerModel.stream(prompt, {
     signal,
   });
   let lastChunk = null;

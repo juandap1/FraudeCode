@@ -1,4 +1,3 @@
-import { HumanMessage } from "@langchain/core/messages";
 import type { AgentStateType } from "../../types/state";
 import summarizePrompt from "../../types/prompts/Summarize";
 import { useFraudeStore } from "../../store/useFraudeStore";
@@ -19,7 +18,8 @@ export const createSummarizeNode = () => {
     //   // 3. Synthesize summary
     const prompt = summarizePrompt(
       state.repoName,
-      state.structuralContext,
+      // state.structuralContext,
+      "",
       codeContext
     );
 
@@ -28,7 +28,7 @@ export const createSummarizeNode = () => {
 
     let summary = "";
     const signal = config?.signal;
-    const stream = await generalModel.stream([new HumanMessage(prompt)], {
+    const stream = await generalModel.stream(prompt, {
       signal,
     });
     let lastChunk = null;

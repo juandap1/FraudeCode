@@ -44,9 +44,9 @@ const parseFileAndTask = (text: string): PlanStep[] => {
   return results;
 };
 
-const generateModifications = async (prompt: string, signal?: AbortSignal) => {
+const generateModifications = async (prompt: any[], signal?: AbortSignal) => {
   let modifications = "";
-  const stream = await generalModel.stream([new HumanMessage(prompt)], {
+  const stream = await generalModel.stream(prompt, {
     signal,
   });
   let lastChunk = null;
@@ -88,8 +88,7 @@ export const createCodeNode = () => {
         const filePath = task.file || "";
         const prompt = ModificationCodeChangesPrompt(
           state.mappedContext[filePath] || "",
-          `IN ${filePath}: ${task.task || ""}`,
-          state.query
+          `IN ${filePath}: ${task.task || ""}`
         );
         log("Coder prompt: ", prompt);
 
@@ -100,11 +99,8 @@ export const createCodeNode = () => {
           (await generateModifications(prompt, config?.signal)) + "\n\n";
       }
     } else {
-      prompt = FastCodeChangesPrompt2(
-        state.codeContext,
-        state.dependencies,
-        state.query
-      );
+      //state.dependencies - neo4j structure generated call dependencies
+      prompt = FastCodeChangesPrompt2(state.codeContext, state.query);
       log("Coder prompt: ", prompt);
 
       const promptSize = prompt.length;
