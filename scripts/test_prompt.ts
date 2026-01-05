@@ -1,6 +1,6 @@
 import { generalModel, thinkerModel } from "../src/services/llm";
 import ModificationCodeChangesPrompt from "../src/types/prompts/modify/CodeChanges";
-import FastCodeChangesPrompt from "../src/types/prompts/modify/FastChangesv2";
+import FastCodeChangesPrompt from "../src/types/prompts/modify/FastChanges";
 import ModificationThinkPrompt from "../src/types/prompts/modify/Think";
 
 const start = Date.now();
