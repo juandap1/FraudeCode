@@ -2,6 +2,11 @@ import * as fs from "fs";
 import * as path from "path";
 import type { PendingChange } from "../types/state";
 
+/**
+ * Normalizes a string for comparison by trimming and replacing multiple whitespace with a single space.
+ */
+const normalize = (s: string) => s.trim().replace(/\s+/g, " ");
+
 export const applyTargetedChanges = (
   modifications: string,
   repoPath: string,
@@ -13,7 +18,6 @@ export const applyTargetedChanges = (
     .split(/\bFILE:\s*/i)
     .filter((b) => b.trim().length > 0);
 
-  // Group blocks by file to avoid multiple PendingChange objects for the same file
   const blocksByFile: Record<string, string[]> = {};
   for (const block of fileBlocks) {
     const blockLines = block.split(/\r?\n/);
@@ -39,7 +43,6 @@ export const applyTargetedChanges = (
     let absPath = path.join(repoPath, filePath);
     if (fs.existsSync(absPath)) return absPath;
 
-    // Try to find the file if the path provided by LLM is incomplete
     const fileName = path.basename(filePath);
     const searchForFile = (dir: string): string | null => {
       const files = fs.readdirSync(dir);
@@ -70,63 +73,126 @@ export const applyTargetedChanges = (
 
     let oldContent = fs.readFileSync(absPath, "utf8");
     let contentLines = oldContent.split(/\r?\n/);
-    const changes: { line: number; remove?: string; add?: string }[] = [];
+
+    interface Modification {
+      rangeStart: number;
+      rangeEnd: number;
+      original?: string;
+      code?: string;
+      type: "legacy" | "new";
+    }
+    const changes: Modification[] = [];
 
     for (const block of blocks) {
-      const atLineSections = block.split(/\bAT LINE\s+/i);
-      for (let i = 1; i < atLineSections.length; i++) {
-        const section = atLineSections[i];
-        if (!section) continue;
+      // 1. Check for New Format (RANGE: X TO Y)
+      const rangeMatch = block.match(/RANGE:\s*(\d+)\s*TO\s*(\d+)/i);
+      if (rangeMatch) {
+        const rangeStart = parseInt(rangeMatch[1]!, 10);
+        const rangeEnd = parseInt(rangeMatch[2]!, 10);
 
-        const lineMatch = section.match(/^(\d+)/);
-        if (!lineMatch) continue;
+        const cleanBlock = (s: string) => {
+          // Remove leading and trailing empty lines but keep indentation of content lines
+          const lines = s.split(/\r?\n/);
+          while (lines.length > 0 && lines[0]?.trim() === "" && lines[0] !== "")
+            lines.shift();
+          // Wait, if lines[0] is "    ", trim() is "", but it has indentation.
+          // We only want to remove lines that are TRULY empty or just have a newline.
+          // Actually, many LLMs put the first line right after the backticks.
 
-        const lineNum = parseInt(lineMatch[1]!, 10);
-        const removeMatch = section.match(
-          /REMOVE:\s*```(?:\w+)?\r?\n([\s\S]*?)```/i
-        );
-        const addMatch = section.match(/ADD:\s*```(?:\w+)?\r?\n([\s\S]*?)```/i);
+          if (lines.length > 0 && lines[0]?.trim() === "") lines.shift();
+          if (lines.length > 0 && lines[lines.length - 1]?.trim() === "")
+            lines.pop();
 
-        if (removeMatch || addMatch) {
-          changes.push({
-            line: lineNum,
-            remove: removeMatch?.[1]?.trimEnd(),
-            add: addMatch?.[1]?.trimEnd(),
-          });
+          return lines.join("\n");
+        };
+
+        const originalMatch =
+          block.match(/ORIGINAL:\s*```(?:\w+)?\s*\n([\s\S]*?)```/i) ||
+          block.match(/ORIGINAL:\s*([\s\S]*?)(?=CODE:|$)/i);
+        const codeMatch =
+          block.match(/CODE:\s*```(?:\w+)?\s*\n([\s\S]*?)```/i) ||
+          block.match(/CODE:\s*([\s\S]*?)$/i);
+
+        const original =
+          originalMatch?.[1] !== undefined
+            ? cleanBlock(originalMatch[1])
+            : originalMatch?.[2]?.trim();
+        const code =
+          codeMatch?.[1] !== undefined
+            ? cleanBlock(codeMatch[1])
+            : codeMatch?.[2]?.trim();
+
+        changes.push({
+          rangeStart,
+          rangeEnd,
+          original,
+          code,
+          type: "new",
+        });
+      } else {
+        const atLineSections = block.split(/\bAT LINE\s+/i);
+        for (let i = 1; i < atLineSections.length; i++) {
+          const section = atLineSections[i];
+          if (!section) continue;
+
+          const lineMatch = section.match(/^(\d+)/);
+          if (!lineMatch) continue;
+
+          const lineNum = parseInt(lineMatch[1]!, 10);
+          const removeMatch = section.match(
+            /REMOVE:\s*```(?:\w+)?\r?\n([\s\S]*?)```/i
+          );
+          const addMatch = section.match(
+            /ADD:\s*```(?:\w+)?\r?\n([\s\S]*?)```/i
+          );
+
+          if (removeMatch || addMatch) {
+            changes.push({
+              rangeStart: lineNum,
+              rangeEnd: lineNum,
+              original: removeMatch?.[1]?.trimEnd(),
+              code: addMatch?.[1]?.trimEnd(),
+              type: "legacy",
+            });
+          }
         }
       }
     }
 
-    // Sort all changes for this file ascending
-    changes.sort((a, b) => a.line - b.line);
+    changes.sort((a, b) => a.rangeStart - b.rangeStart);
 
     let currentOffset = 0;
+    let failedChanges = 0;
+
     for (const change of changes) {
-      let expectedIndex = change.line - 1 + currentOffset;
-      if (expectedIndex < 0) expectedIndex = 0;
-      if (expectedIndex > contentLines.length)
-        expectedIndex = contentLines.length;
+      const { rangeStart, rangeEnd, original, code } = change;
+      const expectedStartIndex = rangeStart - 1 + currentOffset;
 
       let foundIndex = -1;
-      let removeLines: string[] = [];
+      let removeCount = 0;
 
-      if (change.remove) {
-        removeLines = change.remove.split(/\r?\n/);
+      if (original && original.length > 0) {
+        const originalLines = original.split(/\r?\n/);
+        removeCount = originalLines.length;
 
-        // 1. Precise Check + Neighbors (+/- 5 lines)
-        const searchOffsets = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5];
+        const searchOffsets = [0];
+        for (let i = 1; i <= 100; i++) {
+          searchOffsets.push(i, -i);
+        }
+
         for (const offset of searchOffsets) {
-          const checkIndex = expectedIndex + offset;
+          const checkIndex = expectedStartIndex + offset;
           if (
             checkIndex < 0 ||
-            checkIndex + removeLines.length > contentLines.length
+            checkIndex + originalLines.length > contentLines.length
           )
             continue;
 
           let match = true;
-          for (let i = 0; i < removeLines.length; i++) {
+          for (let i = 0; i < originalLines.length; i++) {
             if (
-              contentLines[checkIndex + i]?.trim() !== removeLines[i]?.trim()
+              normalize(contentLines[checkIndex + i]!) !==
+              normalize(originalLines[i]!)
             ) {
               match = false;
               break;
@@ -134,63 +200,106 @@ export const applyTargetedChanges = (
           }
           if (match) {
             foundIndex = checkIndex;
-            if (offset !== 0) currentOffset += offset;
+            updateOutput(
+              "log",
+              `✅ Match found at line ${foundIndex + 1} (offset ${
+                foundIndex - (rangeStart - 1)
+              }) in ${filePath}`
+            );
             break;
-          }
-        }
-
-        // 2. Global Search if fuzzy fails
-        if (foundIndex === -1) {
-          for (let i = 0; i <= contentLines.length - removeLines.length; i++) {
-            let match = true;
-            for (let j = 0; j < removeLines.length; j++) {
-              if (contentLines[i + j]?.trim() !== removeLines[j]?.trim()) {
-                match = false;
-                break;
-              }
-            }
-            if (match) {
-              // If multiple matches, we could try to find the "closest" but for now let's take the first one
-              // and update our offset relative to the expected position
-              foundIndex = i;
-              // Adjust offset so that (line - 1 + offset) points to the found index
-              currentOffset = foundIndex - (change.line - 1);
-              break;
-            }
           }
         }
 
         if (foundIndex === -1) {
           updateOutput(
             "log",
-            `[applyTargetedChanges] FAILED to remove lines at ${change.line} in ${filePath} due to mismatch`
+            `⚠️ Range mismatch for ${filePath}, searching globally...`
           );
-          continue;
+          for (
+            let i = 0;
+            i <= contentLines.length - originalLines.length;
+            i++
+          ) {
+            let match = true;
+            for (let j = 0; j < originalLines.length; j++) {
+              if (
+                normalize(contentLines[i + j]!) !== normalize(originalLines[j]!)
+              ) {
+                match = false;
+                break;
+              }
+            }
+            if (match) {
+              foundIndex = i;
+              updateOutput(
+                "log",
+                `✅ Found original block at line ${
+                  foundIndex + 1
+                } (Global Search)`
+              );
+              break;
+            }
+          }
         }
-
-        contentLines.splice(foundIndex, removeLines.length);
-        currentOffset -= removeLines.length;
+      } else if (change.rangeStart === change.rangeEnd) {
+        foundIndex = Math.max(
+          0,
+          Math.min(expectedStartIndex, contentLines.length)
+        );
+        removeCount = 0;
+        updateOutput("log", `✅ Preparing INSERT at line ${foundIndex + 1}`);
       } else {
-        foundIndex = expectedIndex;
+        foundIndex = Math.max(
+          0,
+          Math.min(expectedStartIndex, contentLines.length)
+        );
+        removeCount = Math.max(0, rangeEnd - rangeStart + 1);
+        updateOutput(
+          "log",
+          `⚠️ Deleting range ${rangeStart}-${rangeEnd} without ORIGINAL block validation`
+        );
       }
 
-      if (change.add) {
-        const addLines = change.add.split(/\r?\n/);
-        contentLines.splice(foundIndex, 0, ...addLines);
-        currentOffset += addLines.length;
+      if (foundIndex === -1) {
+        updateOutput(
+          "log",
+          `❌ FAILURE: Could not find ORIGINAL block in ${filePath} at lines ${rangeStart}-${rangeEnd}`
+        );
+        failedChanges++;
+        continue;
       }
+
+      const linesBefore = contentLines.length;
+      let replacementLines = code ? code.split(/\r?\n/) : [];
+
+      if (replacementLines.length > 0) {
+        // Ensure whitespace around the change
+        if (foundIndex > 0 && contentLines[foundIndex - 1]?.trim() !== "") {
+          replacementLines.unshift("");
+        }
+        if (
+          foundIndex + removeCount < contentLines.length &&
+          contentLines[foundIndex + removeCount]?.trim() !== ""
+        ) {
+          replacementLines.push("");
+        }
+      }
+
+      contentLines.splice(foundIndex, removeCount, ...replacementLines);
+
+      const linesAfter = contentLines.length;
+      currentOffset += linesAfter - linesBefore;
     }
 
-    const newContent = contentLines.join("\n");
-    pendingChanges.push({
-      filePath,
-      absPath,
-      oldContent,
-      newContent,
-    });
+    if (failedChanges < changes.length || changes.length === 0) {
+      pendingChanges.push({
+        filePath,
+        absPath,
+        oldContent,
+        newContent: contentLines.join("\n"),
+      });
+    }
   }
-
-  return pendingChanges;
 
   return pendingChanges;
 };

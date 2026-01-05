@@ -4,7 +4,7 @@ import ModificationCodeChangesPrompt from "../../types/prompts/modify/CodeChange
 import { useFraudeStore } from "../../store/useFraudeStore";
 import { generalModel } from "../../services/llm";
 // import FastCodeChangesPrompt from "../../types/prompts/modify/FastChanges";
-import FastCodeChangesPrompt2 from "../../types/prompts/modify/FastChangesv2";
+import FastCodeChangesPrompt from "../../types/prompts/modify/FastChangesv2";
 import log from "../../utils/logger";
 
 const { updateOutput, setStatus } = useFraudeStore.getState();
@@ -100,7 +100,7 @@ export const createCodeNode = () => {
       }
     } else {
       //state.dependencies - neo4j structure generated call dependencies
-      prompt = FastCodeChangesPrompt2(state.codeContext, state.query);
+      prompt = FastCodeChangesPrompt(state.codeContext, state.query);
       log("Coder prompt: ", prompt);
 
       const promptSize = prompt.length;

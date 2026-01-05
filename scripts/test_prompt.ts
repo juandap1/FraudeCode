@@ -1,5 +1,6 @@
 import { generalModel, thinkerModel } from "../src/services/llm";
 import ModificationCodeChangesPrompt from "../src/types/prompts/modify/CodeChanges";
+import FastCodeChangesPrompt from "../src/types/prompts/modify/FastChangesv2";
 import ModificationThinkPrompt from "../src/types/prompts/modify/Think";
 
 const start = Date.now();
@@ -44,7 +45,7 @@ CODE:
 const task2 =
   "IN main.py: Modify the calculate function to replace the call to utils.subtract with a call to utils.division. Update line 6 to use the new division method instead of subtract.";
 
-const prompt = ModificationCodeChangesPrompt(codeContext2, task2);
+const prompt = FastCodeChangesPrompt(codeContext2, task2);
 
 const stream = await generalModel.stream(prompt);
 
