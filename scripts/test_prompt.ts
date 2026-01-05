@@ -19,6 +19,9 @@ CODE:
 const patchTask =
   "IN utils.py: Add a new function called division that takes num1 and num2 parameters and returns their quotient. Insert this function before the CONSTANT_VALUE definition (lines 7-8 in utils.py)";
 
+const sqrtTask =
+  "Add a function `sqrt` to compute the square root of a number using `math.sqrt` or another method.";
+
 const codeContext2 = `FILE: main.py
 CODE:
 1 - 1: import utils ...
@@ -45,7 +48,13 @@ CODE:
 const task2 =
   "IN main.py: Modify the calculate function to replace the call to utils.subtract with a call to utils.division. Update line 6 to use the new division method instead of subtract.";
 
-const prompt = FastCodeChangesPrompt(codeContext2, task2);
+const pyTask =
+  "Add a function `sqrt` to compute the square root of a number using `math.sqrt` or another method.";
+
+const prompt = FastCodeChangesPrompt(
+  codeChanges + "\n\n" + codeContext2,
+  pyTask
+);
 
 const stream = await generalModel.stream(prompt);
 

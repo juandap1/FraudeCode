@@ -79,6 +79,7 @@ export const applyTargetedChanges = (
       rangeEnd: number;
       original?: string;
       code?: string;
+      explicitType?: string | null;
       type: "legacy" | "new";
     }
     const changes: Modification[] = [];
@@ -90,19 +91,18 @@ export const applyTargetedChanges = (
         const rangeStart = parseInt(rangeMatch[1]!, 10);
         const rangeEnd = parseInt(rangeMatch[2]!, 10);
 
+        // Extract TYPE if present
+        const typeMatch = block.match(/TYPE:\s*(INSERT|DELETE|MODIFY)/i);
+        const explicitType = typeMatch ? typeMatch[1]?.toUpperCase() : null;
+
         const cleanBlock = (s: string) => {
           // Remove leading and trailing empty lines but keep indentation of content lines
           const lines = s.split(/\r?\n/);
           while (lines.length > 0 && lines[0]?.trim() === "" && lines[0] !== "")
             lines.shift();
-          // Wait, if lines[0] is "    ", trim() is "", but it has indentation.
-          // We only want to remove lines that are TRULY empty or just have a newline.
-          // Actually, many LLMs put the first line right after the backticks.
-
           if (lines.length > 0 && lines[0]?.trim() === "") lines.shift();
           if (lines.length > 0 && lines[lines.length - 1]?.trim() === "")
             lines.pop();
-
           return lines.join("\n");
         };
 
@@ -113,20 +113,37 @@ export const applyTargetedChanges = (
           block.match(/CODE:\s*```(?:\w+)?\s*\n([\s\S]*?)```/i) ||
           block.match(/CODE:\s*([\s\S]*?)$/i);
 
-        const original =
+        let original =
           originalMatch?.[1] !== undefined
             ? cleanBlock(originalMatch[1])
-            : originalMatch?.[2]?.trim();
-        const code =
+            : originalMatch?.[2]?.trim() || ""; // Default to empty string if undefined
+
+        let code =
           codeMatch?.[1] !== undefined
             ? cleanBlock(codeMatch[1])
-            : codeMatch?.[2]?.trim();
+            : codeMatch?.[2]?.trim() || ""; // Default to empty string
+
+        // Enforce logic based on explicit TYPE
+        if (explicitType === "INSERT") {
+          original = ""; // Ignore any original text for inserts
+          updateOutput(
+            "log",
+            `[${filePath}] Explicit INSERT detected at ${rangeStart}`
+          );
+        } else if (explicitType === "DELETE") {
+          code = ""; // Ignore any code text for deletes
+          updateOutput(
+            "log",
+            `[${filePath}] Explicit DELETE detected at ${rangeStart}-${rangeEnd}`
+          );
+        }
 
         changes.push({
           rangeStart,
           rangeEnd,
           original,
           code,
+          explicitType,
           type: "new",
         });
       } else {
@@ -171,7 +188,15 @@ export const applyTargetedChanges = (
       let foundIndex = -1;
       let removeCount = 0;
 
+      // Logic:
+      // 1. If we have ORIGINAL content, search for it (Fuzzy Match).
+      // 2. If NO ORIGINAL content:
+      //    a. If explicitType == INSERT, force insert at rangeStart.
+      //    b. If rangeStart == rangeEnd (Implicit INSERT), insert at rangeStart.
+      //    c. Otherwise (Implicit DELETE), delete the range.
+
       if (original && original.length > 0) {
+        // ... (Fuzzy Search Logic) ...
         const originalLines = original.split(/\r?\n/);
         removeCount = originalLines.length;
 
@@ -241,14 +266,19 @@ export const applyTargetedChanges = (
             }
           }
         }
-      } else if (change.rangeStart === change.rangeEnd) {
+      } else if (
+        change.explicitType === "INSERT" ||
+        change.rangeStart === change.rangeEnd
+      ) {
+        // INSERT case
         foundIndex = Math.max(
           0,
           Math.min(expectedStartIndex, contentLines.length)
         );
-        removeCount = 0;
+        removeCount = 0; // FORCE 0 to ensure no deletion
         updateOutput("log", `✅ Preparing INSERT at line ${foundIndex + 1}`);
       } else {
+        // DELETE case (Implicit)
         foundIndex = Math.max(
           0,
           Math.min(expectedStartIndex, contentLines.length)

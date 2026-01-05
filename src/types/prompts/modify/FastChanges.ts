@@ -6,23 +6,33 @@ const FastCodeChangesPrompt = (codeContext: string, query: string) => [
 You must treat the existing code as correct and intentional. Do not refactor, reorganize, demonstrate usage, or improve code unless the user explicitly asks for it.
 
 LOCATION LOGIC: Place new code in the most relevant file. If the request is for a function (math, string parsing, etc.), place it in the appropriate file with other similar functions.
+    
+ONLY PROVIDE PATCHES REQUIRED TO COMPLETE THE TASK. DO NOT ADD ANYTHING ELSE.
 
 <RULES>
-1. Identify the exact line range needed for the change.
-2. To INSERT: Use the same line number for START and END. The new code will be placed at that line.
-3. To DELETE: Provide the range and leave the CODE block empty.
-4. To MODIFY: Provide the range of lines to replace and the updated code.
-5. Do not include line numbers inside the ORIGINAL or CODE block.
+1. To INSERT code:
+   - "RANGE" should be the line number where you want to insert.
+   - "ORIGINAL" block MUST be empty.
+   - "CODE" block contains the new code.
+2. To DELETE code:
+   - "RANGE" covers the lines to delete.
+   - "ORIGINAL" block must contain the exact lines you are deleting.
+   - "CODE" block MUST be empty.
+3. To MODIFY code:
+   - "RANGE" covers the lines to change.
+   - "ORIGINAL" block must contain the exact lines you are replacing.
+   - "CODE" block contains the new version.
 </RULES>
-
+    
 <TARGET_CODE>
 ${codeContext}
 </TARGET_CODE>
 
-OUTPUT FORMAT:
+OUTPUT FORMAT (STRICT):
 FILE: <path/to/file>
+TYPE: <INSERT OR DELETE OR MODIFY>
 RANGE: <start_line> TO <end_line>
-ORIGINAL:
+ORIGINAL (MUST BE EMPTY IF INSERTING):
 \`\`\`<language>
 <exact text of the lines being replaced>
 \`\`\`
@@ -31,12 +41,49 @@ CODE:
 <new_code>
 \`\`\`
 
-ONLY PROVIDE THE PATCHES, NO ADDITIONAL TEXT.
+ONLY PROVIDE THE PATCHES. DO NOT ADD EXPLANATIONS.
+DOUBLE CHECK OUTPUT FOLLOWS ALL THE RULES. BREAKING A RULE WILL RESULT IN A FAILURE.
 `),
-  new HumanMessage(`Task: ${query}\n\nStart listing changes here:`),
+  new HumanMessage(`${query}\n\nStart listing changes here:`),
 ];
 
 export default FastCodeChangesPrompt;
+
+// const FastCodeChangesPrompt = (codeContext: string, query: string) => [
+//   new SystemMessage(`You are a precise code editing engine designed to modify the provided codebase to fulfill the user's request with minimal changes.
+
+// You must treat the existing code as correct and intentional. Do not refactor, reorganize, demonstrate usage, or improve code unless the user explicitly asks for it.
+
+// LOCATION LOGIC: Place new code in the most relevant file. If the request is for a function (math, string parsing, etc.), place it in the appropriate file with other similar functions.
+
+// <RULES>
+// 1. Identify the exact line range needed for the change.
+// 2. To INSERT: Use the same line number for START and END. The new code will be placed at that line. Leave the ORIGINAL block empty.
+// 3. To DELETE: Provide the range and leave the CODE block empty.
+// 4. To MODIFY: Provide the range of lines to replace and the updated code.
+// 5. Do not include line numbers inside the ORIGINAL or CODE block.
+// </RULES>
+
+// <TARGET_CODE>
+// ${codeContext}
+// </TARGET_CODE>
+
+// OUTPUT FORMAT:
+// FILE: <path/to/file>
+// RANGE: <start_line> TO <end_line>
+// ORIGINAL:
+// \`\`\`<language>
+// <exact text of the lines being replaced>
+// \`\`\`
+// CODE:
+// \`\`\`<language>
+// <new_code>
+// \`\`\`
+
+// ONLY PROVIDE THE PATCHES, NO ADDITIONAL TEXT.
+// `),
+//   new HumanMessage(`Task: ${query}\n\nStart listing changes here:`),
+// ];
 
 // const FastCodeChangesPrompt2 = (codeContext: string, query: string) => [
 //   new SystemMessage(`You are a code modification engine.
