@@ -36,15 +36,17 @@ const ModificationThinkPrompt = (codeContext: string, query: string) => [
   new SystemMessage(`You are a product manager tasked with generating a Task List. Each task should describe in detail a functional change in a clear and concise manner.
 OUTPUT ONLY THE PLAN.
 
+LOCATION LOGIC: Place new code in the most relevant file. If the request is for a function (math, string parsing, etc.), place it in the appropriate file with other similar functions.
+
 <HARD RULES>
 1. ADD-FIRST PRIORITY (CRITICAL)
 - Prefer ADDING over REMOVING.
 - Do NOT remove existing functionality unless required to satisfy the request.
-- If the request can be fulfilled by only adding, do not include removals.
 
 2. LOCATION REQUIRED
 - Every task must clearly state where the patch occurs
   (e.g., inside a function, after another function, before a constant or class).
+- A task should target one specific location in the code. Split into multiple tasks if needed.
 </HARD RULES>
 
 <TARGET_CODE>
