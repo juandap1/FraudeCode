@@ -1,7 +1,7 @@
 import { Box } from "ink";
 import OllamaModelSettings from "./settings/OllamaModelSettings";
 
-const SettingsComponent = () => {
+const SettingsComponent = ({ query }: { query: string }) => {
   return (
     <Box flexDirection="column">
       <OllamaModelSettings />

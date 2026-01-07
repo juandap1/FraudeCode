@@ -8,6 +8,7 @@ export type OutputItemType =
   | "confirmation"
   | "command"
   | "checkpoint"
+  | "settings"
   | "comment";
 
 export interface TokenUsage {
@@ -57,7 +58,6 @@ interface FraudeStore {
   executionMode: "Planning" | "Fast";
   promptInfo: PromptInfo | null;
   implementationComment: string | null;
-  settingsMode: boolean;
   // Actions
   addInteraction: () => string;
   updateInteraction: (id: string, updates: Partial<InteractionState>) => void;
@@ -93,7 +93,6 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
   executionMode: "Fast",
   promptInfo: null,
   implementationComment: null,
-  settingsMode: false,
   addInteraction: () => {
     const id = crypto.randomUUID();
     const newInteraction: InteractionState = {
