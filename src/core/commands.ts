@@ -27,6 +27,38 @@ export const COMMANDS: CommandDefinition[] = [
     usage: "/usage",
   },
   {
+    name: "model",
+    description: "Set active model(s) by role",
+    usage: "/model <model-name> [role]",
+    subcommands: [
+      {
+        name: "list",
+        description: "Show current model assignments",
+        usage: "/model list",
+      },
+      {
+        name: "all",
+        description: "Set model for all roles",
+        usage: "/model all <model-name>",
+      },
+      {
+        name: "reasoning",
+        description: "Set reasoning/thinker model",
+        usage: "/model reasoning <model-name>",
+      },
+      {
+        name: "general",
+        description: "Set general purpose model",
+        usage: "/model general <model-name>",
+      },
+      {
+        name: "light",
+        description: "Set light-weight/scout model",
+        usage: "/model light <model-name>",
+      },
+    ],
+  },
+  {
     name: "openrouter",
     description: "Manage OpenRouter models",
     usage: "/openrouter <subcommand>",
