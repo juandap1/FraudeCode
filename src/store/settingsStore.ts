@@ -1,11 +1,12 @@
 import { create } from "zustand";
-import { Settings } from "../utils/Settings";
+import { Settings, type Model } from "../utils/Settings";
 
 interface SettingsState {
   ollamaUrl: string;
   thinkerModel: string;
   generalModel: string;
   scoutModel: string;
+  models: Model[];
   // Actions
   setOllamaUrl: (url: string) => void;
   setThinkerModel: (model: string) => void;
@@ -19,6 +20,7 @@ const DEFAULTS = {
   thinkerModel: "qwen3:8b",
   generalModel: "llama3.1:latest",
   scoutModel: "qwen2.5:0.5b",
+  models: [] as Model[],
 };
 
 export const useSettingsStore = create<SettingsState>()((set) => {
@@ -66,6 +68,7 @@ export const useSettingsStore = create<SettingsState>()((set) => {
           thinkerModel: settings.get("thinkerModel"),
           generalModel: settings.get("generalModel"),
           scoutModel: settings.get("scoutModel"),
+          models: settings.get("models"),
         });
       } catch (e) {
         console.error("Failed to sync settings:", e);

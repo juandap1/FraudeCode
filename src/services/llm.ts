@@ -78,14 +78,17 @@ export const syncOllamaModels = async () => {
     const savedModels = settings.get("models") || [];
     const availableModels = await getOllamaModels();
 
-    const mergedModels: Model[] = [];
+    // Preserve non-Ollama models (groq, openrouter, etc.)
+    const nonOllamaModels = savedModels.filter((m) => m.type !== "ollama");
+
+    const mergedOllamaModels: Model[] = [];
 
     for (const model of availableModels) {
       const existing = savedModels.find(
         (m) => m.name === model.name && m.type === "ollama"
       );
       if (existing && existing.details?.context_length) {
-        mergedModels.push(existing);
+        mergedOllamaModels.push(existing);
         continue;
       }
 
@@ -109,14 +112,15 @@ export const syncOllamaModels = async () => {
           },
         };
 
-        mergedModels.push(enhancedModel);
+        mergedOllamaModels.push(enhancedModel);
       } catch (err) {
         console.error(`Failed to fetch details for ${model.name}`, err);
-        mergedModels.push(model);
+        mergedOllamaModels.push(model);
       }
     }
 
-    await UpdateSettings("models", mergedModels);
+    // Combine non-Ollama models with the updated Ollama models
+    await UpdateSettings("models", [...nonOllamaModels, ...mergedOllamaModels]);
   } catch (error) {
     console.warn("Failed to sync Ollama models:", error);
   }
