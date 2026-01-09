@@ -1,6 +1,6 @@
 import summarizePrompt from "../../types/prompts/Summarize";
 import { useFraudeStore } from "../../store/useFraudeStore";
-import { getGeneralModel } from "../../services/llm";
+import { llm } from "../../services/llm";
 import type { SummaryStateType } from "../../types/state";
 
 const { updateOutput, setStatus } = useFraudeStore.getState();
@@ -27,7 +27,7 @@ export const createSummarizeNode = () => {
 
     let summary = "";
     const signal = config?.signal;
-    const stream = await getGeneralModel().stream(prompt, {
+    const stream = await llm.think().stream(prompt, {
       signal,
     });
     let lastChunk = null;

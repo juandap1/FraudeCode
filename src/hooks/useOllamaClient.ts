@@ -48,7 +48,7 @@ export function useOllamaClient(initialId: string | null = null): OllamaCLI {
         if (query.startsWith("/")) {
           await commandHandler(query);
           updateOutput("settings", query);
-          updateInteraction(id, { status: 2 });
+          updateInteraction(id, { status: 2, settingsInteraction: true });
           return;
         }
 

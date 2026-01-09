@@ -3,7 +3,7 @@ import type { ModifierStateType } from "../../types/state";
 import ModificationCodeChangesPrompt from "../../types/prompts/modify/CodeChanges";
 import FastCodeChangesPrompt from "../../types/prompts/modify/FastChanges";
 import { useFraudeStore } from "../../store/useFraudeStore";
-import { getGeneralModel } from "../../services/llm";
+import { llm } from "../../services/llm";
 import log from "../../utils/logger";
 import {
   applyChangesToContent,
@@ -82,7 +82,7 @@ const generateModifications = async (
   signal?: AbortSignal
 ): Promise<string> => {
   let modifications = "";
-  const stream = await getGeneralModel().stream(prompt, { signal });
+  const stream = await llm.chat().stream(prompt, { signal });
   let lastChunk = null;
 
   for await (const chunk of stream) {

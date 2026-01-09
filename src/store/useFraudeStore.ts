@@ -36,6 +36,7 @@ export interface InteractionState {
   statusText?: string;
   lastBreak: number;
   timeElapsed: number;
+  settingsInteraction: boolean;
 }
 
 export type SelectItem = {
@@ -107,6 +108,7 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
       statusText: undefined,
       lastBreak: 0,
       timeElapsed: 0,
+      settingsInteraction: false,
     };
     set((state) => ({
       interactions: { ...state.interactions, [id]: newInteraction },

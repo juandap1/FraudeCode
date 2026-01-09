@@ -53,7 +53,7 @@ const OllamaClientComponent = ({
 
       {interaction.status !== 0 &&
         interaction.status !== 4 &&
-        interaction.elapsedTime > 0 && (
+        !interaction.settingsInteraction && (
           <LoaderComponent
             id={interaction.interactionId}
             status={interaction.status}

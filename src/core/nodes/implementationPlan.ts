@@ -1,7 +1,7 @@
 import type { ModifierStateType } from "../../types/state";
 import ModificationThinkPrompt from "../../types/prompts/modify/Think";
 import { interrupt, useFraudeStore } from "../../store/useFraudeStore";
-import { getThinkerModel } from "../../services/llm";
+import { llm } from "../../services/llm";
 import generateIterationPrompt from "../../types/prompts/IteratePlan";
 import log from "../../utils/logger";
 
@@ -53,7 +53,7 @@ const iterationLoop = async (
 
 const think = async (prompt: any[], signal?: AbortSignal) => {
   let thinkingProcess = "";
-  const stream = await getThinkerModel().stream(prompt, {
+  const stream = await llm.think().stream(prompt, {
     signal,
   });
   let lastChunk = null;

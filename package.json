@@ -16,7 +16,7 @@
     "@inkkit/ink-markdown": "^1.0.0",
     "@langchain/core": "^1.1.8",
     "@langchain/langgraph": "^1.0.7",
-    "@langchain/ollama": "^1.1.0",
+    "@langchain/openai": "^1.2.1",
     "@qdrant/js-client-rest": "^1.16.2",
     "diff": "^8.0.2",
     "ignore": "^7.0.5",
