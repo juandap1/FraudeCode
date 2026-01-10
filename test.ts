@@ -34,7 +34,11 @@ Create a markdown file called INTRODUCTION.md in the learning directory.
 
 Start the file introducing the language and common uses, as well as any notable features that differentiate it.
 
-Next, provide detailed instructions to make sure the user has everything they need to setup their local environment to execute code and start learning.
+Next, provide detailed instructions on what the user needs to download to get started with the language. Keep this as simple as possible. 
+You can provide optional quality of life suggestions, but keep everything short and simple.
+End with instructions on how to init a rust project in the learning directory.
+
+Create a .gitignore file in the learning directory, to ignore files typically ignored for a rust project.
 `;
 
 const generateLessonPrompt = `
@@ -49,15 +53,18 @@ Your Lesson should have the following:
 - A title for the lesson
 - Topics to be covered in the lesson
 - Provide instruction on what the concepts are and how they can be used. i.e. print in python is used to print text to the console
-- A task for the student to complete to demonstrate their understanding of the lesson
+- A task for the student to complete to demonstrate their understanding of the lesson.
+- The task should have a testable, verifiable output.
+- Provide instructions on how to run the code for the task
 - Keep the lesson short and simple, but explain everything clearly
 - Create a file called LESSON_{title}.md in the learning directory
 </LESSON>
 
 <SETUP>
-- Create any files in the learning directory needed for the student to complete the task.
-- Make sure not to complete the task.
-- Add the skeleton for the function that the user should modify.
+- Create any script files in the "src" folder of the learning directory needed for the student to complete the task.
+- Reference the lesson file name in a comment at the top of each created script file.
+- Only add the skeleton for the function that the user should modify.
+- Make sure not to complete the task for the user.
 - Add comments to the skeleton to explain what the function should do.
 </SETUP>
 `;
@@ -89,8 +96,8 @@ async function main() {
       }),
     ],
   });
-  // await useAgent(agent, introPrompt);
-  await useAgent(agent, generateLessonPrompt);
+  await useAgent(agent, introPrompt);
+  // await useAgent(agent, generateLessonPrompt);
 }
 
 const useAgent = async (agent: ReactAgent, query: string) => {
@@ -141,5 +148,7 @@ const viewLessonHistory = tool(
     schema: z.object({}),
   }
 );
+
+// TODO: Save ingestable lesson data (critique user code), testing
 
 main();
