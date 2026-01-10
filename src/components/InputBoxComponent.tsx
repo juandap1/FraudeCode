@@ -28,11 +28,13 @@ const SPECIFIC_MODEL_PREFIXES = getSpecificModelPrefixes();
 
 const InputBoxComponent = ({ OllamaClient }: { OllamaClient: OllamaCLI }) => {
   const { exit } = useApp();
+  const history = useFraudeStore((state) => state.history);
   const addToHistory = useFraudeStore((state) => state.addToHistory);
 
   // Track current input for showing dropdown
   const [currentInput, setCurrentInput] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [historyIndex, setHistoryIndex] = useState(-1);
   // Key to force TextInput remount when we want to set a new value
   const [inputKey, setInputKey] = useState(0);
   const [defaultValue, setDefaultValue] = useState("");
@@ -181,11 +183,12 @@ const InputBoxComponent = ({ OllamaClient }: { OllamaClient: OllamaCLI }) => {
       setDefaultValue(actualGhostTextSuggestion);
       setCurrentInput(actualGhostTextSuggestion);
       setInputKey((k) => k + 1);
+      setHistoryIndex(-1);
       return;
     }
 
-    // Navigate dropdown suggestions
-    if (filteredTemplates.length > 0) {
+    // If input starts with "/" and there are multiple suggestions, use arrow keys for command dropdown
+    if (currentInput.startsWith("/") && filteredTemplates.length > 1) {
       if (key.upArrow) {
         setSelectedIndex((prev) =>
           prev > 0 ? prev - 1 : filteredTemplates.length - 1
@@ -199,6 +202,41 @@ const InputBoxComponent = ({ OllamaClient }: { OllamaClient: OllamaCLI }) => {
         return;
       }
     }
+
+    // Otherwise, use arrow keys for history navigation
+    // Note: history[0] is the most recent item in useFraudeStore
+    if (key.upArrow && history.length > 0) {
+      const newIndex =
+        historyIndex < history.length - 1 ? historyIndex + 1 : historyIndex;
+      setHistoryIndex(newIndex);
+      const historyItem = history[newIndex];
+      if (historyItem) {
+        setDefaultValue(historyItem);
+        setCurrentInput(historyItem);
+        setInputKey((k) => k + 1);
+      }
+      return;
+    }
+    // Down arrow: go to newer history or clear input
+    if (key.downArrow) {
+      if (historyIndex > 0) {
+        const newIndex = historyIndex - 1;
+        setHistoryIndex(newIndex);
+        const historyItem = history[newIndex];
+        if (historyItem) {
+          setDefaultValue(historyItem);
+          setCurrentInput(historyItem);
+          setInputKey((k) => k + 1);
+        }
+      } else {
+        // Clear input when at the end of history or not in history
+        setHistoryIndex(-1);
+        setDefaultValue("");
+        setCurrentInput("");
+        setInputKey((k) => k + 1);
+      }
+      return;
+    }
   });
 
   const processSubmit = (v: string) => {
@@ -210,6 +248,7 @@ const InputBoxComponent = ({ OllamaClient }: { OllamaClient: OllamaCLI }) => {
     addToHistory(v);
     setCurrentInput("");
     setDefaultValue("");
+    setHistoryIndex(-1);
     setInputKey((k) => k + 1);
     OllamaClient.handleQuery(v);
   };
