@@ -15,11 +15,11 @@ function llmClient(config: ModelConfig) {
   const providerConfigs = {
     groq: {
       baseURL: "https://api.groq.com/openai/v1",
-      apiKey: process.env.GROQ_API_KEY,
+      apiKey: getSettings().groq_api_key,
     },
     openrouter: {
       baseURL: "https://openrouter.ai/api/v1",
-      apiKey: process.env.OPENROUTER_API_KEY,
+      apiKey: getSettings().openrouter_api_key,
     },
     ollama: {
       baseURL: "http://localhost:11434/v1", // Note the /v1 for compatibility

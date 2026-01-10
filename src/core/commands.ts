@@ -69,6 +69,11 @@ export const COMMANDS: CommandDefinition[] = [
         description: "Add an OpenRouter model",
         usage: "/openrouter add <model-id>",
       },
+      {
+        name: "auth",
+        description: "Set OpenRouter API key",
+        usage: "/openrouter auth <api-key>",
+      },
     ],
   },
   {
@@ -86,6 +91,11 @@ export const COMMANDS: CommandDefinition[] = [
         name: "add",
         description: "Add a Groq model",
         usage: "/groq add <model-id>",
+      },
+      {
+        name: "auth",
+        description: "Set Groq API key",
+        usage: "/groq auth <api-key>",
       },
     ],
   },

@@ -7,6 +7,8 @@ interface SettingsState {
   generalModel: string;
   scoutModel: string;
   models: Model[];
+  groq_api_key: string;
+  openrouter_api_key: string;
   // Actions
   setOllamaUrl: (url: string) => void;
   setThinkerModel: (model: string) => void;
@@ -21,6 +23,8 @@ const DEFAULTS = {
   generalModel: "llama3.1:latest",
   scoutModel: "qwen2.5:0.5b",
   models: [] as Model[],
+  groq_api_key: "",
+  openrouter_api_key: "",
 };
 
 export const useSettingsStore = create<SettingsState>()((set) => {

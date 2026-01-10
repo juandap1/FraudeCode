@@ -142,6 +142,14 @@ export const openRouterCommandHandler = async (command: string[]) => {
         }
         await addOpenRouterModel(model);
         break;
+      case "auth":
+        const apiKey = command.shift();
+        if (!apiKey) {
+          setError("No API key specified (OpenRouter)");
+          return;
+        }
+        await openRouterAuth(apiKey);
+        break;
       default:
         setError("Unknown command (OpenRouter)");
         break;
@@ -203,4 +211,9 @@ export const addOpenRouterModel = async (model: string) => {
   }
   await UpdateSettings("models", savedModels);
   updateOutput("log", "OpenRouter model added: " + model);
+};
+
+export const openRouterAuth = async (apiKey: string) => {
+  await UpdateSettings("openrouter_api_key", apiKey);
+  updateOutput("log", "OpenRouter API key set");
 };

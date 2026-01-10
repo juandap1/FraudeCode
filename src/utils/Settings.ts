@@ -32,6 +32,8 @@ const SettingsSchema = z.object({
   generalModel: z.string().default("llama3.1:latest"),
   scoutModel: z.string().default("qwen2.5:0.5b"),
   models: z.array(ModelSchema).default([]),
+  openrouter_api_key: z.string().optional(),
+  groq_api_key: z.string().optional(),
 });
 
 type Config = z.infer<typeof SettingsSchema>;

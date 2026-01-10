@@ -16,6 +16,14 @@ export const groqCommandHandler = async (command: string[]) => {
         }
         await addGroqModel(model);
         break;
+      case "auth":
+        const apiKey = command.shift();
+        if (!apiKey) {
+          setError("No API key specified (Groq)");
+          return;
+        }
+        await groqAuth(apiKey);
+        break;
       default:
         setError("Unknown command (Groq)");
         break;
@@ -68,4 +76,9 @@ export const addGroqModel = async (model: string) => {
   }
   await UpdateSettings("models", savedModels);
   updateOutput("log", "Groq model added: " + model);
+};
+
+export const groqAuth = async (apiKey: string) => {
+  await UpdateSettings("groq_api_key", apiKey);
+  updateOutput("log", "Groq API key set");
 };

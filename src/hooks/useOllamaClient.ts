@@ -82,7 +82,7 @@ export function useOllamaClient(initialId: string | null = null): OllamaCLI {
     [addInteraction, updateInteraction]
   );
 
-  const commandHandler = (query: string) => {
+  const commandHandler = async (query: string) => {
     const { updateOutput } = useFraudeStore.getState();
     let command = query.slice(1).split(" ");
     const base = command.shift();
@@ -95,12 +95,12 @@ export function useOllamaClient(initialId: string | null = null): OllamaCLI {
         handleModelCommand(command);
         break;
       case "openrouter":
-        openRouterCommandHandler(command);
+        await openRouterCommandHandler(command);
         break;
       case "ollama":
         break;
       case "groq":
-        groqCommandHandler(command);
+        await groqCommandHandler(command);
         break;
       case "models": // Auto outputs models list
         break;
