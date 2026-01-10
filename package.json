@@ -13,19 +13,19 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
+    "@inkjs/ui": "^2.0.0",
     "@inkkit/ink-markdown": "^1.0.0",
     "@langchain/core": "^1.1.8",
     "@langchain/langgraph": "^1.0.7",
-    "@langchain/ollama": "^1.1.0",
+    "@langchain/openai": "^1.2.1",
     "@qdrant/js-client-rest": "^1.16.2",
     "diff": "^8.0.2",
     "ignore": "^7.0.5",
     "ink-big-text": "^2.0.0",
     "ink-gradient": "^3.0.0",
-    "ink-select-input": "^6.2.0",
-    "ink-text-input": "^6.0.0",
     "neo4j-driver": "^6.0.1",
     "web-tree-sitter": "^0.25.10",
+    "zod": "^4.3.5",
     "zustand": "^5.0.9"
   },
   "scripts": {

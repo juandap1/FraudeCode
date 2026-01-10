@@ -5,10 +5,16 @@ import CommentView from "./CommentView";
 import { Box, Text } from "ink";
 import Markdown from "@inkkit/ink-markdown";
 import DiffViewer from "./DiffViewer";
+import SettingsComponent from "../SettingsComponent";
+import ErrorView from "./ErrorView";
 
 // OutputRenderer component that renders each output item based on its type
 const OutputRenderer = memo(({ item }: { item: OutputItem }) => {
   switch (item.type) {
+    case "error":
+      return <ErrorView error={item.content} />;
+    case "settings":
+      return <SettingsComponent query={item.content} />;
     case "command":
       return <CommandView command={item.content} />;
     case "comment":

@@ -17,7 +17,8 @@ export const createModifyProjectTool = (
           "The detailed request from the user describing what to modify."
         ),
     }),
-    func: async ({ request }) => {
+    func: async (input: any) => {
+      const { request } = input;
       const result = await langgraphModify(
         request,
         promptUserConfirmation,

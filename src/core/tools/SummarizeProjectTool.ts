@@ -15,7 +15,8 @@ export const createSummarizeProjectTool = () => {
           "The query describing what to summarize (e.g., 'summarize project', 'overview of functions').Defaults to 'Overview of the project functions and classes' if not specified."
         ),
     }),
-    func: async ({ query }) => {
+    func: async (input: any) => {
+      const { query } = input;
       await summarizeProject(getSignal());
       return "Summary generation initiated.";
     },

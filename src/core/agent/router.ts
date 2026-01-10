@@ -6,7 +6,7 @@ import {
   ToolMessage,
 } from "@langchain/core/messages";
 import { type DynamicStructuredTool } from "@langchain/core/tools";
-import { generalModel, scoutModel } from "../../services/llm";
+import { llm } from "../../services/llm";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { useFraudeStore } from "../../store/useFraudeStore";
 import { RouterState, type RouterStateType } from "../../types/state";
@@ -15,7 +15,7 @@ import log from "../../utils/logger";
 const { setStatus, updateTokenUsage, updateOutput } = useFraudeStore.getState();
 
 export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
-  const modelWithTools = generalModel.bindTools(tools);
+  const modelWithTools = llm.chat().bindTools(tools);
 
   const toolNode = new ToolNode<RouterStateType>(tools);
 
@@ -24,12 +24,14 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
     const lastMessage = state.messages[state.messages.length - 1];
     if (!lastMessage) return "general";
 
-    const response = await scoutModel.invoke([
-      new SystemMessage(
-        "Classify the user query into 'project' if it's related to the current codebase, project structure, coding questions, or requested actions. Classify as 'general' ONLY if it's completely unrelated conversation (greetings, off-topic questions, etc.). IMPORTANT: Respond with exactly one word: 'project' or 'general'."
-      ),
-      lastMessage,
-    ]);
+    const response = await llm
+      .scout()
+      .invoke([
+        new SystemMessage(
+          "Classify the user query into 'project' if it's related to the current codebase, project structure, coding questions, or requested actions. Classify as 'general' ONLY if it's completely unrelated conversation (greetings, off-topic questions, etc.). IMPORTANT: Respond with exactly one word: 'project' or 'general'."
+        ),
+        lastMessage,
+      ]);
     const usage = response.usage_metadata;
     if (usage) {
       updateTokenUsage({
@@ -83,7 +85,7 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
     setStatus("Pondering");
     const { messages } = state;
     let fullResponse: any = null;
-    const stream = await generalModel.stream(messages, {
+    const stream = await llm.chat().stream(messages, {
       signal: config?.signal,
     });
     let lastChunk = null;
@@ -135,32 +137,14 @@ export const createRouterGraph = (tools: DynamicStructuredTool[]) => {
     .addNode("general", callGeneralModel)
     .addNode("tools", toolNode)
     .addConditionalEdges(START, classifyIntent, {
-      project: "project",
-      general: "general",
+      project: "project", // If the user query is related to the current codebase, project structure, coding questions, or requested actions
+      general: "general", // If the user query is completely unrelated conversation (greetings, off-topic questions, etc.)
     })
     .addConditionalEdges("project", shouldContinue, {
-      tools: "tools",
-      [END]: END,
+      tools: "tools", // If the user query is related to the current codebase, project structure, coding questions, or requested actions
+      [END]: END, // If the user query is completely unrelated conversation (greetings, off-topic questions, etc.)
     })
-    .addConditionalEdges(
-      "tools",
-      (state: RouterStateType) => {
-        const lastMessage = state.messages[state.messages.length - 1];
-        if (
-          lastMessage instanceof ToolMessage &&
-          (lastMessage.content.toString().includes("User rejected") ||
-            lastMessage.content.toString().includes("successfully applied"))
-        ) {
-          log("Modifications finalized, ending session early.");
-          return END;
-        }
-        return "project";
-      },
-      {
-        project: "project",
-        [END]: END,
-      }
-    )
+    .addEdge("tools", END)
     .addEdge("general", END);
 
   return workflow.compile();

@@ -1,4 +1,4 @@
-import { generalModel, thinkerModel } from "../src/services/llm";
+import { getGeneralModel, getThinkerModel } from "../src/services/llm";
 import ModificationCodeChangesPrompt from "../src/types/prompts/modify/CodeChanges";
 import FastCodeChangesPrompt from "../src/types/prompts/modify/FastChanges";
 import ModificationThinkPrompt from "../src/types/prompts/modify/Think";
@@ -56,14 +56,14 @@ const prompt = FastCodeChangesPrompt(
   pyTask
 );
 
-const stream = await generalModel.stream(prompt);
+const stream = await getGeneralModel().stream(prompt);
 
 // const prompt = ModificationThinkPrompt(
 //   codeChanges + "\n\n" + codeContext2,
 //   "Create a new method called division that takes two parameters, num1 and num2, and returns their quotient. Then, modify the existing calculate function to call this new division method."
 // );
 
-// const stream = await thinkerModel.stream(prompt);
+// const stream = await getThinkerModel().stream(prompt);
 
 for await (const chunk of stream) {
   process.stdout.write(chunk.content as string);

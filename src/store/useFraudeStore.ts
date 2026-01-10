@@ -8,7 +8,9 @@ export type OutputItemType =
   | "confirmation"
   | "command"
   | "checkpoint"
-  | "comment";
+  | "settings"
+  | "comment"
+  | "error";
 
 export interface TokenUsage {
   total: number;
@@ -34,6 +36,7 @@ export interface InteractionState {
   statusText?: string;
   lastBreak: number;
   timeElapsed: number;
+  settingsInteraction: boolean;
 }
 
 export type SelectItem = {
@@ -68,6 +71,7 @@ interface FraudeStore {
     changes?: PendingChange[],
     id?: string
   ) => void;
+  setError: (error: string, interrupt?: boolean, id?: string) => void;
   setStatus: (statusText: string | undefined, id?: string) => void;
   setCurrentInteraction: (id: string | null) => void;
   promptUserConfirmation: (
@@ -104,6 +108,7 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
       statusText: undefined,
       lastBreak: 0,
       timeElapsed: 0,
+      settingsInteraction: false,
     };
     set((state) => ({
       interactions: { ...state.interactions, [id]: newInteraction },
@@ -195,6 +200,32 @@ export const useFraudeStore = create<FraudeStore>((set) => ({
       };
     });
   },
+
+  setError: (error, interrupt?, id?) => {
+    set((state) => {
+      const interactionId = id || state.currentInteractionId;
+      if (!interactionId) return state;
+      const interaction = state.interactions[interactionId];
+      if (!interaction) return state;
+      const outputItems = [...interaction.outputItems];
+      outputItems.push({
+        id: crypto.randomUUID(),
+        type: "error",
+        content: error,
+      });
+      return {
+        interactions: {
+          ...state.interactions,
+          [interactionId]: {
+            ...interaction,
+            status: 2,
+            outputItems,
+          },
+        },
+      };
+    });
+  },
+
   setStatus: (statusText, id) => {
     set((state) => {
       const interactionId = id || state.currentInteractionId;
