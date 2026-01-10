@@ -46,6 +46,8 @@ export const useSettingsStore = create<SettingsState>()((set) => {
           generalModel: settings.get("generalModel"),
           scoutModel: settings.get("scoutModel"),
           models: settings.get("models"),
+          groq_api_key: settings.get("groq_api_key"),
+          openrouter_api_key: settings.get("openrouter_api_key"),
         });
       } catch (e) {
         console.error("Failed to sync settings:", e);
