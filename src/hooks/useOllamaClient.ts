@@ -18,6 +18,7 @@ import { getCommandHelp } from "../core/commands";
 import { useSettingsStore } from "../store/settingsStore";
 import { Settings, UpdateSettings } from "../utils/Settings";
 import { groqCommandHandler } from "../services/groq";
+import learningRouter from "../core/agent/router2";
 
 export interface OllamaCLI {
   handleQuery: (query: string) => Promise<void>;
@@ -57,20 +58,22 @@ export function useOllamaClient(initialId: string | null = null): OllamaCLI {
 
         initSignal();
 
-        const tools = [
-          createModifyProjectTool(promptUserConfirmation),
-          createSummarizeProjectTool(),
-        ];
+        await learningRouter();
 
-        const router = createRouterGraph(tools);
+        // const tools = [
+        //   createModifyProjectTool(promptUserConfirmation),
+        //   createSummarizeProjectTool(),
+        // ];
 
-        await router.invoke(
-          { messages: [new HumanMessage(query)] },
-          {
-            configurable: { thread_id: id },
-            signal: getSignal(),
-          }
-        );
+        // const router = createRouterGraph(tools);
+
+        // await router.invoke(
+        //   { messages: [new HumanMessage(query)] },
+        //   {
+        //     configurable: { thread_id: id },
+        //     signal: getSignal(),
+        //   }
+        // );
 
         updateInteraction(id, { status: 2 });
       } catch (error: any) {

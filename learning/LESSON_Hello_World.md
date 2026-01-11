@@ -1,48 +1,36 @@
-# Hello World Lesson
-
-## Title
-**Hello World in Rust**
+# Hello World
 
 ## Topics Covered
 - Setting up a Rust project
-- The `main` function
+- `fn main` entry point
+- Defining functions
 - Printing to the console with `println!`
-- Basic Cargo commands (`cargo run`)
 
-## Lesson Content
-Rust programs start execution from the `main` function.  To output text to the console you use the `println!` macro, which works similarly to `print` statements in other languages but requires an exclamation mark because it is a macro.
+## Introduction
+In this lesson you'll learn how to write the classic **Hello, World!** program in Rust. This program demonstrates the basic structure of a Rust program, how to define a function, and how to output text to the console.
 
-```rust
-fn main() {
-    println!("Hello, world!");
-}
-```
-
-When you run a Rust program using Cargo (Rust’s package manager and build tool), Cargo will compile the code and then execute the resulting binary.
+## Concepts
+- **`fn main()`**: The entry point of every Rust executable. The code inside `main` runs when you execute the program.
+- **Functions**: Reusable blocks of code. We'll create a simple function `greet` that returns a greeting string.
+- **`println!` macro**: Used to print text followed by a newline to the console. It's similar to `print` in other languages.
 
 ## Task
-Create a Rust program that prints the following exact line to the console:
+Create a function named `greet` that returns the string `"Hello, world!"`. Then, modify the `main` function to call `greet` and print its result using `println!`.
+
+### Expected Output
+When you run the program, it should print exactly:
 ```
-Hello, Rust learner!
+Hello, world!
 ```
 
-### Requirements
-- Do **not** change the name of the `main` function.
-- Use the `println!` macro to output the text.
-- The output must match exactly, including capitalization and punctuation.
+## How to Run
+1. Open a terminal and navigate to the learning directory.
+2. Build and run the program with:
+   ```
+   cargo run --quiet
+   ```
+   (The `--quiet` flag suppresses Cargo's build output, showing only the program's output.)
 
-### How to Run Your Code
-1. Open a terminal and navigate to the `learning` directory.
-2. Run the command `cargo run`.
-3. You should see the expected output printed to the console.
+Make sure the output matches the expected output above.
 
-### Verification
-When you run `cargo run`, the program should terminate without errors and display:
-```
-Hello, Rust learner!
-```
-If the output matches, you have successfully completed the lesson.
-
----
-
-**Happy coding!**
+Good luck!

@@ -1,1 +1,13 @@
-{"lang":"rust","lessons":[]}
+{
+  "lang": "rust",
+  "lessons": [],
+  "currentLesson": {
+    "title": "Hello World",
+    "lessonFile": "LESSON_Hello_World.md",
+    "testName": "hello_world_test",
+    "sourceFiles": [
+      "src/main.rs"
+    ],
+    "startedAt": "2026-01-11T23:21:04.990Z"
+  }
+}

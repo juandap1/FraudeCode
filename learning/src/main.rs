@@ -1,9 +1,14 @@
 // LESSON_Hello_World.md
-// Skeleton for Hello World task. Complete the `println!` statement to match the required output.
+// Task: Implement the `greet` function to return "Hello, world!" and use it in `main`.
+
+fn greet() -> &'static str {
+    // TODO: Return the greeting string.
+    // Hint: The string should be exactly "Hello, world!"
+    "Hello, world!"
+}
 
 fn main() {
-    // TODO: Print "Hello, Rust learner!" to the console.
-    // Use the `println!` macro.
-    // Example: println!("Your text here");
-    println!("Hello, Rust learner!");
+    // Call the greet function and print its result.
+    // Use the `println!` macro to output the string.
+    println!("{}", greet());
 }
