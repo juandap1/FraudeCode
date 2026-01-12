@@ -3,26 +3,7 @@ import log from "./logger";
 import { join } from "path";
 import { homedir, platform } from "os";
 import { rename, mkdir } from "fs/promises";
-
-const ModelSchema = z.object({
-  type: z.string().default("ollama"),
-  name: z.string(),
-  modified_at: z.string(),
-  size: z.number().optional(),
-  digest: z.string(),
-  capabilities: z.array(z.string()).optional(),
-  usage: z.number().default(0),
-  details: z.object({
-    format: z.string().optional(),
-    family: z.string().optional(),
-    families: z.array(z.string()).optional(),
-    parameter_size: z.string().optional(),
-    quantization_level: z.string().optional(),
-    context_length: z.number().optional(),
-  }),
-});
-
-export type Model = z.infer<typeof ModelSchema>;
+import { ModelSchema } from "../types/Model";
 
 const SettingsSchema = z.object({
   lifetimeTokenUsage: z.number().default(0),

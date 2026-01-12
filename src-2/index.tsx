@@ -1,16 +1,15 @@
 import { render } from "ink";
 import App from "./components/App";
 import { resetLog } from "./utils/logger";
-import { Settings } from "./utils/Settings";
+import { Settings } from "./utils/settings";
 import useSettingsStore from "./store/useSettingsStore";
+import { syncOllamaModels } from "./services/ollama";
 
 async function main() {
   resetLog();
   console.clear();
   await Settings.init();
-  // syncOllamaModels().catch((e) => {
-  //   console.error("Background model sync failed:", e);
-  // });
+  syncOllamaModels();
   useSettingsStore.getState().syncWithSettings();
   render(<App />);
 }
