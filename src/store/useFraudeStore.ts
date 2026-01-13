@@ -1,21 +1,5 @@
 import { create } from "zustand";
-
-export type OutputItemType =
-  | "log"
-  | "markdown"
-  | "diff"
-  | "confirmation"
-  | "command"
-  | "checkpoint"
-  | "settings"
-  | "comment"
-  | "error";
-
-export interface OutputItem {
-  id: string;
-  type: OutputItemType;
-  content: string;
-}
+import type { OutputItem, OutputItemType } from "@/types/OutputItem";
 
 interface FraudeStore {
   outputItems: OutputItem[];

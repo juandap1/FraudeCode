@@ -1,6 +1,6 @@
 import { Box } from "ink";
 import { memo } from "react";
-import { type OutputItem } from "../store/useFraudeStore";
+import { type OutputItem } from "@/types/OutputItem";
 import useFraudeStore from "../store/useFraudeStore";
 import CommandView from "./output/CommandView";
 import CommentView from "./output/CommentView";

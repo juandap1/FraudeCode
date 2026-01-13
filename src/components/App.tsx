@@ -4,6 +4,7 @@ import InputBox from "./input/InputBox";
 import OutputRenderer from "./OutputRenderer";
 import useFraudeStore from "../store/useFraudeStore";
 import IntroComponent from "./IntroComponent";
+import LoaderComponent from "./LoaderComponent";
 export default function App() {
   const { status, started } = useFraudeStore();
 
@@ -16,16 +17,13 @@ export default function App() {
     //   process.exit(0);
     // }
   });
-  return (
+  return !started ? (
+    <IntroComponent />
+  ) : (
     <Box flexDirection="column">
-      {!started ? (
-        <IntroComponent />
-      ) : (
-        <Box flexDirection="column">
-          <OutputRenderer />
-          {status === 0 && <InputBox />}
-        </Box>
-      )}
+      <OutputRenderer />
+      {status === 0 && <InputBox />}
+      {status === 1 && <LoaderComponent />}
     </Box>
   );
 }
