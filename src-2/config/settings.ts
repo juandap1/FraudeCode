@@ -1,5 +1,5 @@
 import { z } from "zod";
-import log from "./logger";
+import log from "../utils/logger";
 import { join } from "path";
 import { homedir, platform } from "os";
 import { rename, mkdir } from "fs/promises";
@@ -162,5 +162,7 @@ const UpdateSettings = async <K extends keyof Config>(
 ) => {
   await Settings.getInstance().set(key, value);
 };
+
+export default Settings;
 
 export { Settings, type Config, UpdateSettings };

@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { Settings, type Model } from "../utils/Settings";
+import { Settings } from "../config/settings";
+import type { Model } from "../types/Model";
 
 interface SettingsState {
   ollamaUrl: string;
