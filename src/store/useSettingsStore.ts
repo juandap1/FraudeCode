@@ -7,6 +7,7 @@ interface SettingsState {
   thinkerModel: string;
   generalModel: string;
   models: Model[];
+  history: string[];
   groq_api_key: string;
   openrouter_api_key: string;
   // Actions
@@ -19,6 +20,7 @@ const DEFAULTS = {
   thinkerModel: "qwen3:8b",
   generalModel: "llama3.1:latest",
   models: [] as Model[],
+  history: [] as string[],
   groq_api_key: "",
   openrouter_api_key: "",
 };
@@ -44,6 +46,7 @@ const useSettingsStore = create<SettingsState>()((set) => {
           thinkerModel: settings.get("thinkerModel"),
           generalModel: settings.get("generalModel"),
           models: settings.get("models"),
+          history: settings.get("history"),
           groq_api_key: settings.get("groq_api_key"),
           openrouter_api_key: settings.get("openrouter_api_key"),
         });

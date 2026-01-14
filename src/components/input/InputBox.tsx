@@ -5,6 +5,7 @@ import { homedir } from "os";
 import QueryHandler from "@/utils/queryHandler";
 import useSettingsStore from "@/store/useSettingsStore";
 import CommandCenter from "@/features/commands";
+import { addHistory } from "@/config/settings";
 import CommandSuggestions from "./CommandSuggestions";
 
 const shortenPath = (path: string) => {
@@ -20,7 +21,9 @@ const InputBoxComponent = () => {
   const [inputKey, setInputKey] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [currentInput, setCurrentInput] = useState("");
+  const [historyIndex, setHistoryIndex] = useState(-1);
 
+  const history = useSettingsStore((state) => state.history);
   const models = useSettingsStore((state) => state.models);
   const modelNames = useMemo(() => models.map((m) => m.name).sort(), [models]);
 
@@ -99,7 +102,7 @@ const InputBoxComponent = () => {
     if (key.tab && actualGhostTextSuggestion) {
       setCurrentInput(actualGhostTextSuggestion);
       setInputKey((k) => k + 1);
-      // setHistoryIndex(-1);
+      setHistoryIndex(-1);
       return;
     }
 
@@ -121,38 +124,35 @@ const InputBoxComponent = () => {
 
     // // Otherwise, use arrow keys for history navigation
     // // Note: history[0] is the most recent item in useFraudeStore
-    // if (key.upArrow && history.length > 0) {
-    //   const newIndex =
-    //     historyIndex < history.length - 1 ? historyIndex + 1 : historyIndex;
-    //   setHistoryIndex(newIndex);
-    //   const historyItem = history[newIndex];
-    //   if (historyItem) {
-    //     setDefaultValue(historyItem);
-    //     setCurrentInput(historyItem);
-    //     setInputKey((k) => k + 1);
-    //   }
-    //   return;
-    // }
-    // // Down arrow: go to newer history or clear input
-    // if (key.downArrow) {
-    //   if (historyIndex > 0) {
-    //     const newIndex = historyIndex - 1;
-    //     setHistoryIndex(newIndex);
-    //     const historyItem = history[newIndex];
-    //     if (historyItem) {
-    //       setDefaultValue(historyItem);
-    //       setCurrentInput(historyItem);
-    //       setInputKey((k) => k + 1);
-    //     }
-    //   } else {
-    //     // Clear input when at the end of history or not in history
-    //     setHistoryIndex(-1);
-    //     setDefaultValue("");
-    //     setCurrentInput("");
-    //     setInputKey((k) => k + 1);
-    //   }
-    //   return;
-    // }
+    if (key.upArrow && history.length > 0) {
+      const newIndex =
+        historyIndex < history.length - 1 ? historyIndex + 1 : historyIndex;
+      setHistoryIndex(newIndex);
+      const historyItem = history[newIndex];
+      if (historyItem) {
+        setCurrentInput(historyItem);
+        setInputKey((k) => k + 1);
+      }
+      return;
+    }
+    // Down arrow: go to newer history or clear input
+    if (key.downArrow) {
+      if (historyIndex > 0) {
+        const newIndex = historyIndex - 1;
+        setHistoryIndex(newIndex);
+        const historyItem = history[newIndex];
+        if (historyItem) {
+          setCurrentInput(historyItem);
+          setInputKey((k) => k + 1);
+        }
+      } else {
+        // Clear input when at the end of history or not in history
+        setHistoryIndex(-1);
+        setCurrentInput("");
+        setInputKey((k) => k + 1);
+      }
+      return;
+    }
   });
 
   const handleChange = useCallback((value: string) => {
@@ -166,7 +166,7 @@ const InputBoxComponent = () => {
       return;
     }
     if (v.trim() === "") return;
-    // addToHistory(v);
+    addHistory(v);
     setCurrentInput("");
     setInputKey((k) => k + 1); // Clear input by remounting TextInput
     QueryHandler(v);

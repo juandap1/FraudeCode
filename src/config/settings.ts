@@ -4,6 +4,7 @@ import { join } from "path";
 import { homedir, platform } from "os";
 import { rename, mkdir } from "fs/promises";
 import { ModelSchema } from "../types/Model";
+import useSettingsStore from "@/store/useSettingsStore";
 
 const SettingsSchema = z.object({
   lifetimeTokenUsage: z.number().default(0),
@@ -12,6 +13,7 @@ const SettingsSchema = z.object({
   thinkerModel: z.string().default("qwen3:8b"),
   generalModel: z.string().default("llama3.1:latest"),
   models: z.array(ModelSchema).default([]),
+  history: z.array(z.string()).default([]),
   openrouter_api_key: z.string().optional(),
   groq_api_key: z.string().optional(),
 });
@@ -161,8 +163,15 @@ const UpdateSettings = async <K extends keyof Config>(
   value: Config[K]
 ) => {
   await Settings.getInstance().set(key, value);
+  useSettingsStore.setState({ [key]: value });
+};
+
+const addHistory = async (value: string) => {
+  const history = Settings.getInstance().get("history");
+  const newHistory = [value, ...history].slice(0, 50);
+  await UpdateSettings("history", newHistory);
 };
 
 export default Settings;
 
-export { Settings, type Config, UpdateSettings };
+export { Settings, type Config, UpdateSettings, addHistory };
