@@ -17,8 +17,8 @@ import type {
   StepInfo,
   AgentUsage,
 } from "@/types/Agent";
-import ContextManager from "./contextManager";
 import log from "@/utils/logger";
+import useFraudeStore from "@/store/useFraudeStore";
 
 // ============================================================================
 // Helper to extract usage from SDK response
@@ -50,7 +50,6 @@ export default class Agent {
   private config: AgentConfig;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private model: any;
-  private contextManager: ContextManager;
 
   constructor(config: AgentConfig) {
     this.config = {
@@ -61,7 +60,6 @@ export default class Agent {
       ...config,
     };
     this.model = getModel(config.model);
-    this.contextManager = new ContextManager();
   }
 
   // ==========================================================================
@@ -76,7 +74,8 @@ export default class Agent {
     input: string,
     options?: Partial<AgentConfig>
   ): Promise<AgentResponse> {
-    const messages = this.contextManager.addContext(input);
+    const contextManager = useFraudeStore.getState().contextManager;
+    const messages = contextManager.addContext(input);
     const mergedConfig = { ...this.config, ...options };
 
     const result = await generateText({
@@ -97,7 +96,7 @@ export default class Agent {
     });
 
     // Update conversation history
-    this.contextManager.addContext(result.response.messages);
+    contextManager.addContext(result.response.messages);
 
     return this.mapResponse(result);
   }
@@ -110,7 +109,8 @@ export default class Agent {
     input: string,
     options?: Partial<AgentConfig>
   ): StreamingAgentResponse {
-    const messages = this.contextManager.addContext(input);
+    const contextManager = useFraudeStore.getState().contextManager;
+    const messages = contextManager.addContext(input);
     const mergedConfig = { ...this.config, ...options };
 
     const result = streamText({
@@ -164,7 +164,8 @@ export default class Agent {
       schemaDescription?: string;
     }
   ): Promise<StructuredAgentResponse<T>> {
-    const messages = this.contextManager.addContext(input);
+    const contextManager = useFraudeStore.getState().contextManager;
+    const messages = contextManager.addContext(input);
     const mergedConfig = { ...this.config, ...options };
 
     const result = await generateText({
@@ -297,12 +298,13 @@ export default class Agent {
     result: ReturnType<typeof streamText>,
     messages: ModelMessage[]
   ): Promise<AgentResponse> {
+    const contextManager = useFraudeStore.getState().contextManager;
     // Wait for the stream to complete
     const finalResult = await result;
 
     // Update conversation history
     const responseMessages = await result.response;
-    this.contextManager.addContext(responseMessages.messages);
+    contextManager.addContext(responseMessages.messages);
 
     const text = await result.text;
     const usage = await result.usage;

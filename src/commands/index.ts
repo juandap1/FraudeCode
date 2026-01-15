@@ -1,6 +1,9 @@
 import type { CommandDefinition } from "@/types/CommandDefinition";
 import ModelCommandCenter from "./models";
 import COMMANDS from "./COMMANDS";
+import useFraudeStore from "@/store/useFraudeStore";
+
+const { updateOutput } = useFraudeStore.getState();
 
 // Class for handling commands
 class CommandCenter {
@@ -9,6 +12,9 @@ class CommandCenter {
     const base = command.shift();
     switch (base) {
       case "help":
+        break;
+      case "context":
+        updateOutput("settings", "/context");
         break;
       case "model":
       case "openrouter":

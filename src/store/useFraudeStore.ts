@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { OutputItem, OutputItemType } from "@/types/OutputItem";
+import ContextManager from "@/agent/contextManager";
 
 interface FraudeStore {
   outputItems: OutputItem[];
@@ -8,6 +9,7 @@ interface FraudeStore {
   elapsedTime: number;
   lastBreak: number;
   statusText?: string;
+  contextManager: ContextManager;
   updateOutput: (type: OutputItemType, content: string) => void;
 }
 
@@ -18,18 +20,19 @@ const useFraudeStore = create<FraudeStore>((set) => ({
   elapsedTime: 0,
   lastBreak: 0,
   statusText: "",
+  contextManager: new ContextManager(),
   updateOutput: (type, content) => {
     set((state) => {
       const outputItems = [...state.outputItems];
       const latestOutput = outputItems[outputItems.length - 1];
       let extraChanges = {};
-      if (type === "checkpoint") {
-        let elapsed = state.elapsedTime - state.lastBreak;
-        extraChanges = {
-          lastBreak: state.elapsedTime,
-        };
-        content += ` · (${(elapsed / 10).toFixed(1)}s)`;
-      }
+      // if (type === "checkpoint") {
+      //   let elapsed = state.elapsedTime - state.lastBreak;
+      //   extraChanges = {
+      //     lastBreak: state.elapsedTime,
+      //   };
+      //   content += ` · (${(elapsed / 10).toFixed(1)}s)`;
+      // }
       const dontOverrideType = new Set(["log", "checkpoint"]);
       if (
         latestOutput &&
