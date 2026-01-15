@@ -92,10 +92,9 @@ class OllamaClient {
       }
 
       // Combine non-Ollama models with the updated Ollama models
-      await UpdateSettings("models", [
-        ...nonOllamaModels,
-        ...mergedOllamaModels,
-      ]);
+      await UpdateSettings({
+        models: [...nonOllamaModels, ...mergedOllamaModels],
+      });
     } catch (error) {
       console.warn("Failed to sync Ollama models:", error);
     }

@@ -18,6 +18,7 @@ import type {
   SimpleMessage,
   AgentUsage,
 } from "@/types/Agent";
+import ContextManager from "./contextManager";
 
 // ============================================================================
 // Helper to extract usage from SDK response
@@ -44,37 +45,12 @@ function extractUsage(usage: unknown): AgentUsage {
 /**
  * A provider-agnostic Agent class that provides a unified interface for
  * interacting with various LLM providers (Groq, Ollama, OpenRouter, etc.)
- *
- * @example
- * ```typescript
- * const agent = new Agent({
- *   model: "llama3.1:latest",
- *   systemPrompt: "You are a helpful assistant.",
- *   temperature: 0.7,
- * });
- *
- * // Simple chat
- * const response = await agent.chat("Hello, how are you?");
- *
- * // With conversation history
- * const response = await agent.chat([
- *   { role: "user", content: "Hello" },
- *   { role: "assistant", content: "Hi there!" },
- *   { role: "user", content: "What's the weather?" }
- * ]);
- *
- * // Streaming
- * const stream = agent.stream("Tell me a story");
- * for await (const chunk of stream.textStream) {
- *   process.stdout.write(chunk);
- * }
- * ```
  */
 export default class Agent {
   private config: AgentConfig;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private model: any;
-  private conversationHistory: ModelMessage[] = [];
+  private contextManager: ContextManager;
 
   constructor(config: AgentConfig) {
     this.config = {
@@ -85,6 +61,7 @@ export default class Agent {
       ...config,
     };
     this.model = getModel(config.model);
+    this.contextManager = new ContextManager();
   }
 
   // ==========================================================================
@@ -96,10 +73,10 @@ export default class Agent {
    * Supports both simple string input and full message history.
    */
   async chat(
-    input: string | SimpleMessage[] | ModelMessage[],
+    input: string,
     options?: Partial<AgentConfig>
   ): Promise<AgentResponse> {
-    const messages = this.buildMessages(input);
+    const messages = this.contextManager.addContext(input);
     const mergedConfig = { ...this.config, ...options };
 
     const result = await generateText({
@@ -120,7 +97,7 @@ export default class Agent {
     });
 
     // Update conversation history
-    this.conversationHistory = [...messages, ...result.response.messages];
+    this.contextManager.addContext(result.response.messages);
 
     return this.mapResponse(result);
   }
@@ -130,10 +107,10 @@ export default class Agent {
    * Returns an async iterable for text chunks and a promise for the full response.
    */
   stream(
-    input: string | SimpleMessage[] | ModelMessage[],
+    input: string,
     options?: Partial<AgentConfig>
   ): StreamingAgentResponse {
-    const messages = this.buildMessages(input);
+    const messages = this.contextManager.addContext(input);
     const mergedConfig = { ...this.config, ...options };
 
     const result = streamText({
@@ -180,14 +157,14 @@ export default class Agent {
    * ```
    */
   async generate<T>(
-    input: string | SimpleMessage[] | ModelMessage[],
+    input: string,
     schema: StructuredSchema<T>,
     options?: Partial<AgentConfig> & {
       schemaName?: string;
       schemaDescription?: string;
     }
   ): Promise<StructuredAgentResponse<T>> {
-    const messages = this.buildMessages(input);
+    const messages = this.contextManager.addContext(input);
     const mergedConfig = { ...this.config, ...options };
 
     const result = await generateText({
@@ -209,38 +186,6 @@ export default class Agent {
       finishReason: result.finishReason ?? "unknown",
       raw: result,
     };
-  }
-
-  // ==========================================================================
-  // Conversation Management
-  // ==========================================================================
-
-  /**
-   * Get the current conversation history
-   */
-  getHistory(): ModelMessage[] {
-    return [...this.conversationHistory];
-  }
-
-  /**
-   * Clear the conversation history
-   */
-  clearHistory(): void {
-    this.conversationHistory = [];
-  }
-
-  /**
-   * Add a message to the conversation history
-   */
-  addMessage(message: ModelMessage): void {
-    this.conversationHistory.push(message);
-  }
-
-  /**
-   * Set the entire conversation history
-   */
-  setHistory(messages: ModelMessage[]): void {
-    this.conversationHistory = [...messages];
   }
 
   // ==========================================================================
@@ -291,24 +236,6 @@ export default class Agent {
   // ==========================================================================
   // Private Helpers
   // ==========================================================================
-
-  private buildMessages(
-    input: string | SimpleMessage[] | ModelMessage[]
-  ): ModelMessage[] {
-    if (typeof input === "string") {
-      return [
-        ...this.conversationHistory,
-        { role: "user", content: input } as ModelMessage,
-      ];
-    }
-
-    // Check if it's already ModelMessage[] format
-    if (Array.isArray(input) && input.length > 0) {
-      return input as ModelMessage[];
-    }
-
-    return this.conversationHistory;
-  }
 
   private mapResponse(
     result: Awaited<ReturnType<typeof generateText>>
@@ -373,7 +300,7 @@ export default class Agent {
 
     // Update conversation history
     const responseMessages = await result.response;
-    this.conversationHistory = [...messages, ...responseMessages.messages];
+    this.contextManager.addContext(responseMessages.messages);
 
     const text = await result.text;
     const usage = await result.usage;
@@ -413,47 +340,4 @@ export default class Agent {
  */
 export function createAgent(config: AgentConfig): Agent {
   return new Agent(config);
-}
-
-/**
- * Create a quick agent for one-off interactions (no conversation memory)
- */
-export async function quickChat(
-  model: string,
-  prompt: string,
-  options?: Partial<Omit<AgentConfig, "model">>
-): Promise<string> {
-  const agent = new Agent({ model, ...options });
-  const response = await agent.chat(prompt);
-  return response.text;
-}
-
-/**
- * Create an agent optimized for reasoning/thinking tasks
- */
-export function createThinker(
-  model: string,
-  options?: Partial<AgentConfig>
-): Agent {
-  return new Agent({
-    model,
-    temperature: 0.3,
-    systemPrompt: `You are a careful, analytical thinker. Take your time to reason through problems step by step. Consider multiple perspectives and potential edge cases before arriving at a conclusion.`,
-    ...options,
-  });
-}
-
-/**
- * Create an agent optimized for creative tasks
- */
-export function createCreative(
-  model: string,
-  options?: Partial<AgentConfig>
-): Agent {
-  return new Agent({
-    model,
-    temperature: 0.9,
-    systemPrompt: `You are a creative assistant with a flair for imagination and originality. Think outside the box and offer unique, engaging ideas.`,
-    ...options,
-  });
 }

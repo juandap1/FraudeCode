@@ -12,6 +12,7 @@ const SettingsSchema = z.object({
   ollamaUrl: z.string().default("http://localhost:11434"),
   thinkerModel: z.string().default("qwen3:8b"),
   generalModel: z.string().default("llama3.1:latest"),
+  lightWeightModel: z.string().default("llama3.1:latest"),
   models: z.array(ModelSchema).default([]),
   history: z.array(z.string()).default([]),
   openrouter_api_key: z.string().optional(),
@@ -24,6 +25,7 @@ class Settings {
   private static instance: Settings | null = null;
   private settingsDir: string;
   private settings: Config;
+  private writePromise: Promise<void> = Promise.resolve(); // Chain writes to prevent race conditions
 
   private constructor(config: Config, configDir: string) {
     this.settings = config;
@@ -144,32 +146,37 @@ class Settings {
 
   /**
    * Save current settings to disk atomically.
+   * Writes are chained to prevent race conditions.
    */
   private async saveToDisk(): Promise<void> {
-    const settingsPath = join(this.settingsDir, "settings.json");
-    const tempPath = `${settingsPath}.tmp`;
-    const content = JSON.stringify(this.settings, null, 2);
+    // Chain this write after any pending write completes
+    const doWrite = async () => {
+      const settingsPath = join(this.settingsDir, "settings.json");
+      const tempPath = `${settingsPath}.tmp`;
+      const content = JSON.stringify(this.settings, null, 2);
 
-    // Ensure the directory exists
-    await mkdir(this.settingsDir, { recursive: true });
+      // Ensure the directory exists
+      await mkdir(this.settingsDir, { recursive: true });
 
-    await Bun.write(tempPath, content);
-    await rename(tempPath, settingsPath);
+      await Bun.write(tempPath, content);
+      await rename(tempPath, settingsPath);
+    };
+
+    // Queue this write after the previous one (even if it failed)
+    this.writePromise = this.writePromise.then(doWrite, doWrite);
+    await this.writePromise;
   }
 }
 
-const UpdateSettings = async <K extends keyof Config>(
-  key: K,
-  value: Config[K]
-) => {
-  await Settings.getInstance().set(key, value);
-  useSettingsStore.setState({ [key]: value });
+const UpdateSettings = async (updates: Partial<Config>) => {
+  await Settings.getInstance().setMultiple(updates);
+  useSettingsStore.setState({ ...updates });
 };
 
 const addHistory = async (value: string) => {
   const history = Settings.getInstance().get("history");
   const newHistory = [value, ...history].slice(0, 50);
-  await UpdateSettings("history", newHistory);
+  await UpdateSettings({ history: newHistory });
 };
 
 export default Settings;

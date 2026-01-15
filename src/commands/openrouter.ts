@@ -3,6 +3,7 @@ import type { Model } from "@/types/Model";
 
 import useFraudeStore from "@/store/useFraudeStore";
 import OpenRouterClient from "@/services/openrouter";
+import useSettingsStore from "@/store/useSettingsStore";
 
 const { updateOutput } = useFraudeStore.getState();
 
@@ -60,8 +61,7 @@ export const addOpenRouterModel = async (model: string) => {
     },
   };
 
-  const settings = Settings.getInstance();
-  const savedModels = settings.get("models") || [];
+  const savedModels = useSettingsStore.getState().models || [];
 
   // Check if model already exists, update if so, else add
   const existingIndex = savedModels.findIndex(
@@ -73,11 +73,11 @@ export const addOpenRouterModel = async (model: string) => {
   } else {
     savedModels.push(newModel);
   }
-  await UpdateSettings("models", savedModels);
+  await UpdateSettings({ models: savedModels });
   updateOutput("log", "OpenRouter model added: " + model);
 };
 
 export const openRouterAuth = async (apiKey: string) => {
-  await UpdateSettings("openrouter_api_key", apiKey);
+  await UpdateSettings({ openrouter_api_key: apiKey });
   updateOutput("log", "OpenRouter API key set");
 };

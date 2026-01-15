@@ -17,6 +17,7 @@ const COLORS = {
 const ROLE_ABBREV: Record<string, { short: string; color: string }> = {
   Reasoning: { short: "R", color: "#9370DB" }, // Purple
   General: { short: "G", color: "#20B2AA" }, // Teal
+  Lightweight: { short: "L", color: "#ffc169" }, // Orange
 };
 
 const formatSize = (bytes: number) => {
@@ -221,8 +222,13 @@ const Legend = () => (
 );
 
 const ModelList = () => {
-  const { thinkerModel, generalModel, models, syncWithSettings } =
-    useSettingsStore();
+  const {
+    thinkerModel,
+    generalModel,
+    lightWeightModel,
+    models,
+    syncWithSettings,
+  } = useSettingsStore();
 
   useEffect(() => {
     syncWithSettings();
@@ -232,6 +238,7 @@ const ModelList = () => {
     const roles: string[] = [];
     if (name.includes(thinkerModel)) roles.push("Reasoning");
     if (name.includes(generalModel)) roles.push("General");
+    if (name.includes(lightWeightModel)) roles.push("Lightweight");
     return roles;
   };
 

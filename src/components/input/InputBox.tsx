@@ -160,7 +160,8 @@ const InputBoxComponent = () => {
     setSelectedIndex(0);
   }, []);
 
-  const processSubmit = (v: string) => {
+  const processSubmit = () => {
+    const v = currentInput;
     if (v.trim().toLowerCase() === "exit") {
       exit();
       return;
@@ -181,10 +182,10 @@ const InputBoxComponent = () => {
           <TextInput
             key={inputKey}
             placeholder="Enter command or query..."
-            onSubmit={processSubmit}
             onChange={handleChange}
             suggestions={dynamicSuggestions}
             defaultValue={currentInput}
+            onSubmit={processSubmit}
           />
         </Box>
       </Box>

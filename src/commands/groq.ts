@@ -1,6 +1,7 @@
-import { Settings, UpdateSettings } from "@/config/settings";
+import { UpdateSettings } from "@/config/settings";
 import type { Model } from "@/types/Model";
 
+import useSettingsStore from "@/store/useSettingsStore";
 import useFraudeStore from "@/store/useFraudeStore";
 import GroqClient from "@/services/groq";
 
@@ -54,8 +55,7 @@ export const addGroqModel = async (model: string) => {
     },
   };
 
-  const settings = Settings.getInstance();
-  const savedModels = settings.get("models") || [];
+  const savedModels = useSettingsStore.getState().models || [];
 
   const existingIndex = savedModels.findIndex(
     (m) => m.name === newModel.name && m.type === "groq"
@@ -66,11 +66,11 @@ export const addGroqModel = async (model: string) => {
   } else {
     savedModels.push(newModel);
   }
-  await UpdateSettings("models", savedModels);
+  await UpdateSettings({ models: savedModels });
   updateOutput("log", "Groq model added: " + model);
 };
 
 export const groqAuth = async (apiKey: string) => {
-  await UpdateSettings("groq_api_key", apiKey);
+  await UpdateSettings({ groq_api_key: apiKey });
   updateOutput("log", "Groq API key set");
 };

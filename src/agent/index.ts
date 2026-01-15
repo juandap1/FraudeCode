@@ -1,11 +1,5 @@
 // Agent module exports
-export {
-  default as Agent,
-  createAgent,
-  quickChat,
-  createThinker,
-  createCreative,
-} from "./agent";
+export { default as Agent, createAgent } from "./agent";
 
 export type {
   AgentConfig,

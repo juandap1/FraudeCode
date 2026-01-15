@@ -1,11 +1,11 @@
 import useSettingsStore from "src/store/useSettingsStore";
-import Settings from "src/config/settings";
+import Settings, { UpdateSettings } from "src/config/settings";
 import useFraudeStore from "src/store/useFraudeStore";
 import { groqCommandHandler } from "./groq";
 import { openRouterCommandHandler } from "./openrouter";
+import log from "@/utils/logger";
 
 const { updateOutput } = useFraudeStore.getState();
-const store = useSettingsStore.getState();
 
 class ModelCommandCenter {
   processCommand = async (query: string) => {
@@ -32,6 +32,7 @@ class ModelCommandCenter {
   };
 
   setModel = async (args: string[]) => {
+    const store = useSettingsStore.getState();
     const models = store.models;
 
     const subcommand = args[0]?.toLowerCase() ?? "";
@@ -95,10 +96,19 @@ Roles: r|reasoning, g|general, a|all`;
       return;
     }
 
-    const matchedModel = models.find((m) =>
-      m.name.toLowerCase().includes(modelName.toLowerCase())
+    const matchedModel = models.find(
+      (m) => m.name.toLowerCase() == modelName.toLowerCase()
     );
-    const finalModelName = matchedModel?.name || modelName;
+
+    if (!matchedModel) {
+      updateOutput(
+        "error",
+        `Error: Model "${modelName}" not found. Use /model list to see available models.`
+      );
+      return;
+    }
+
+    const finalModelName = matchedModel.name;
     const changedRoles: string[] =
       role === "all" ? ["reasoning", "general"] : [role];
     const updates: Record<string, string> = {};
@@ -123,14 +133,11 @@ Roles: r|reasoning, g|general, a|all`;
     }
 
     // Single write for all updates
-    await Settings.getInstance().setMultiple(updates);
+    await UpdateSettings(updates);
 
-    const matchNote = matchedModel
-      ? ""
-      : " (model not found in registry, using as-is)";
     updateOutput(
       "log",
-      `✓ Set ${changedRoles.join(", ")} model to: ${finalModelName}${matchNote}`
+      `✓ Set ${changedRoles.join(", ")} model to: ${finalModelName}`
     );
   };
 }

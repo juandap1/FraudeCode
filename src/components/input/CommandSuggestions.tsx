@@ -33,7 +33,7 @@ export default function CommandSuggestions({
       {/* Show role hint if selected command has [role] */}
       {filteredTemplates[selectedIndex]?.usage.includes("[role]") && (
         <Text dimColor italic>
-          {"  "}[role]: reasoning | general | all (or r|g|a)
+          {"  "}[role]: reasoning | general | light | all (or r|g|l|a)
         </Text>
       )}
     </Box>

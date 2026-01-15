@@ -15,7 +15,7 @@ class CommandCenter {
       case "ollama":
       case "groq":
       case "models":
-        ModelCommandCenter.processCommand(query);
+        await ModelCommandCenter.processCommand(query);
         break;
       default:
         // updateOutput(

@@ -41,6 +41,11 @@ const COMMANDS: CommandDefinition[] = [
         description: "Set general purpose model",
         usage: "/model general <model-name>",
       },
+      {
+        name: "light",
+        description: "Set lightweight model",
+        usage: "/model light <model-name>",
+      },
     ],
   },
   {
