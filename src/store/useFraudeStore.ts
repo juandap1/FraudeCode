@@ -3,6 +3,7 @@ import type { OutputItem, OutputItemType } from "@/types/OutputItem";
 import ContextManager from "@/agent/contextManager";
 
 interface FraudeStore {
+  executionMode: 0 | 1 | 2; // 0 = Fast, 1 = Plan, 2 = Ask
   outputItems: OutputItem[];
   started: boolean;
   status: number; // 0 = idle, 1 = running
@@ -14,6 +15,7 @@ interface FraudeStore {
 }
 
 const useFraudeStore = create<FraudeStore>((set) => ({
+  executionMode: 0,
   outputItems: [],
   started: false,
   status: 0,

@@ -3,9 +3,11 @@ import { useApp, Box, Text, useInput } from "ink";
 import { TextInput } from "@inkjs/ui";
 import QueryHandler from "@/utils/queryHandler";
 import useSettingsStore from "@/store/useSettingsStore";
+import useFraudeStore from "@/store/useFraudeStore";
 import CommandCenter from "@/commands";
 import { addHistory } from "@/config/settings";
 import CommandSuggestions from "./CommandSuggestions";
+import { shortenPath } from "@/utils";
 
 const InputBoxComponent = () => {
   const { exit } = useApp();
@@ -49,6 +51,15 @@ const InputBoxComponent = () => {
         return s.usage.startsWith(currentInput);
       })
       .slice(0, MAX_VISIBLE_SUGGESTIONS);
+    if (
+      filteredTemplates.length === 1 &&
+      (filteredTemplates[0]?.usage.toLowerCase() ===
+        currentInput.toLowerCase() ||
+        filteredTemplates[0]?.renderedOptions?.find(
+          (option) => option.toLowerCase() === currentInput.toLowerCase()
+        ))
+    )
+      return [];
     return filteredTemplates;
   }, [suggestions, currentInput]);
 
@@ -90,10 +101,22 @@ const InputBoxComponent = () => {
   }, [currentInput, dynamicSuggestions]);
 
   useInput((input, key) => {
-    if (key.tab && actualGhostTextSuggestion) {
-      setCurrentInput(actualGhostTextSuggestion);
-      setInputKey((k) => k + 1);
-      setHistoryIndex(-1);
+    if (key.tab) {
+      if (
+        actualGhostTextSuggestion &&
+        actualGhostTextSuggestion.toLowerCase() != currentInput.toLowerCase()
+      ) {
+        setCurrentInput(actualGhostTextSuggestion);
+        setInputKey((k) => k + 1);
+        setHistoryIndex(-1);
+      } else {
+        useFraudeStore.setState({
+          executionMode: ((useFraudeStore.getState().executionMode + 1) % 3) as
+            | 0
+            | 1
+            | 2,
+        });
+      }
       return;
     }
 
@@ -164,6 +187,17 @@ const InputBoxComponent = () => {
     QueryHandler(v);
   };
 
+  const getExecutionMode = (mode: 0 | 1 | 2) => {
+    switch (mode) {
+      case 0:
+        return "Fast";
+      case 1:
+        return "Planning";
+      case 2:
+        return "Ask";
+    }
+  };
+
   return (
     <Box flexDirection="column" padding={1}>
       <Text>Type something and press enter or type "exit" to exit:</Text>
@@ -180,19 +214,22 @@ const InputBoxComponent = () => {
           />
         </Box>
       </Box>
-      {dropdownSuggestions.length > 0 && (
+      {dropdownSuggestions.length > 0 ? (
         <CommandSuggestions
           selectedIndex={selectedIndex}
           filteredTemplates={dropdownSuggestions}
         />
+      ) : (
+        <Box width={70} justifyContent="space-between" paddingX={1}>
+          <Text color="gray">{shortenPath(process.cwd())}</Text>
+          <Text color="cyan">
+            <Text bold>
+              {getExecutionMode(useFraudeStore.getState().executionMode)} (Tab
+              to Change)
+            </Text>
+          </Text>
+        </Box>
       )}
-
-      {/* <Box width={70} justifyContent="space-between" paddingX={1}>
-        <Text color="gray">{shortenPath(process.cwd())}</Text>
-        <Text color="cyan">
-          <Text bold>{useFraudeStore.getState().executionMode}</Text>
-        </Text>
-      </Box> */}
     </Box>
   );
 };
