@@ -1,5 +1,11 @@
 import type { z } from "zod";
-import type { Tool, ModelMessage, ToolSet } from "ai";
+import type {
+  Tool,
+  ModelMessage,
+  ToolSet,
+  AsyncIterableStream,
+  TextStreamPart,
+} from "ai";
 
 // ============================================================================
 // Agent Configuration Types
@@ -102,7 +108,7 @@ export interface AgentResponse {
 
 export interface StreamingAgentResponse {
   /** Async iterator for text chunks */
-  textStream: AsyncIterable<string>;
+  stream: AsyncIterable<string> | AsyncIterableStream<TextStreamPart<ToolSet>>;
 
   /** Promise that resolves to the full response when streaming completes */
   response: Promise<AgentResponse>;

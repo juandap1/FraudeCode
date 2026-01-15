@@ -7,7 +7,10 @@ export type OutputItemType =
   | "checkpoint"
   | "settings"
   | "comment"
-  | "error";
+  | "error"
+  | "reasoning"
+  | "toolCall"
+  | "agentText";
 
 export interface OutputItem {
   id: string;

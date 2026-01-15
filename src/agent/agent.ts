@@ -15,10 +15,10 @@ import type {
   ToolCallInfo,
   ToolResultInfo,
   StepInfo,
-  SimpleMessage,
   AgentUsage,
 } from "@/types/Agent";
 import ContextManager from "./contextManager";
+import log from "@/utils/logger";
 
 // ============================================================================
 // Helper to extract usage from SDK response
@@ -136,7 +136,7 @@ export default class Agent {
     });
 
     return {
-      textStream: result.textStream,
+      stream: result.fullStream,
       response: this.buildStreamingResponse(result, messages),
     };
   }
@@ -271,6 +271,8 @@ export default class Agent {
     const toolResults = step.toolResults as
       | Array<Record<string, unknown>>
       | undefined;
+
+    log(`Step ${step.stepNumber}: ${JSON.stringify(step, null, 2)}`);
 
     return {
       stepNumber: (step.stepNumber as number) ?? 0,

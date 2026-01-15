@@ -7,6 +7,9 @@ import CommentView from "./output/CommentView";
 import MarkdownView from "./output/MarkdownView";
 import SettingsRenderer from "./SettingsRenderer";
 import ErrorView from "./output/ErrorView";
+import ReasoningView from "./output/ReasoningView";
+import ToolCallView from "./output/ToolCallView";
+import AgentTextView from "./output/AgentTextView";
 
 function renderItem(item: OutputItem) {
   switch (item.type) {
@@ -28,6 +31,25 @@ function renderItem(item: OutputItem) {
       return <MarkdownView markdown={item.content} />;
     case "settings":
       return <SettingsRenderer item={item} />;
+    case "reasoning":
+      return <ReasoningView content={item.content} />;
+    case "toolCall": {
+      try {
+        const data = JSON.parse(item.content);
+        return (
+          <ToolCallView
+            toolName={data.toolName}
+            args={data.args}
+            result={data.result}
+            duration={data.duration}
+          />
+        );
+      } catch {
+        return <Text dimColor>{item.content}</Text>;
+      }
+    }
+    case "agentText":
+      return <AgentTextView content={item.content} />;
     default:
       return null;
   }

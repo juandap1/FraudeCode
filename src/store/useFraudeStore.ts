@@ -30,11 +30,11 @@ const useFraudeStore = create<FraudeStore>((set) => ({
         };
         content += ` · (${(elapsed / 10).toFixed(1)}s)`;
       }
-      const overrideType = new Set(["log", "checkpoint"]);
+      const dontOverrideType = new Set(["log", "checkpoint"]);
       if (
         latestOutput &&
         latestOutput.type === type &&
-        !overrideType.has(type)
+        !dontOverrideType.has(type)
       ) {
         outputItems[outputItems.length - 1] = {
           ...latestOutput,
