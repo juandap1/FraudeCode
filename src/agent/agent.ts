@@ -120,6 +120,7 @@ export default class Agent {
       temperature: mergedConfig.temperature,
       maxOutputTokens: mergedConfig.maxTokens,
       tools: mergedConfig.tools,
+      abortSignal: mergedConfig.abortSignal,
       stopWhen: mergedConfig.maxSteps
         ? stepCountIs(mergedConfig.maxSteps)
         : undefined,

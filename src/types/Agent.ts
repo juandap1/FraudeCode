@@ -47,6 +47,9 @@ export interface AgentConfig {
 
   /** Callback for step completion */
   onStepComplete?: (step: StepInfo) => void;
+
+  /** Abort signal for cancelling the request */
+  abortSignal?: AbortSignal;
 }
 
 // ============================================================================

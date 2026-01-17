@@ -24,7 +24,7 @@
     "ink-big-text": "^2.0.0",
     "ink-gradient": "^3.0.0",
     "neo4j-driver": "^6.0.1",
-    "ollama-ai-provider": "^1.2.0",
+    "ollama-ai-provider-v2": "^3.0.1",
     "web-tree-sitter": "^0.25.10",
     "zod": "^4.3.5",
     "zustand": "^5.0.9"

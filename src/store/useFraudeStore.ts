@@ -1,27 +1,30 @@
 import { create } from "zustand";
 import type { OutputItem, OutputItemType } from "@/types/OutputItem";
 import ContextManager from "@/agent/contextManager";
+import log from "@/utils/logger";
 
 interface FraudeStore {
   executionMode: 0 | 1 | 2; // 0 = Fast, 1 = Plan, 2 = Ask
   outputItems: OutputItem[];
   started: boolean;
-  status: number; // 0 = idle, 1 = running
+  status: number; // 0 = idle, 1 = running, -1 = interrupted
   elapsedTime: number;
   lastBreak: number;
   statusText?: string;
   contextManager: ContextManager;
+  abortController: AbortController | null;
+  interruptAgent: () => void;
   updateOutput: (
     type: OutputItemType,
     content: string,
     config?: {
       duration?: number;
       dontOverride?: boolean;
-    }
+    },
   ) => void;
 }
 
-const useFraudeStore = create<FraudeStore>((set) => ({
+const useFraudeStore = create<FraudeStore>((set, get) => ({
   executionMode: 0,
   outputItems: [],
   started: false,
@@ -30,6 +33,17 @@ const useFraudeStore = create<FraudeStore>((set) => ({
   lastBreak: 0,
   statusText: "",
   contextManager: new ContextManager(),
+  abortController: null,
+  interruptAgent: () => {
+    const controller = get().abortController;
+    if (controller && !controller.signal.aborted) {
+      try {
+        controller.abort();
+      } catch (e) {
+        log(`Abort caught: ${e}`);
+      }
+    }
+  },
   updateOutput: (type, content, config) => {
     set((state) => {
       const outputItems = [...state.outputItems];

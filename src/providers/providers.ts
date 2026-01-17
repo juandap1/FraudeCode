@@ -1,6 +1,6 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGroq } from "@ai-sdk/groq";
-import { ollama } from "ollama-ai-provider";
+import { createOllama } from "ollama-ai-provider-v2";
 import useSettingsStore from "@/store/useSettingsStore";
 import type { ProviderType } from "@/types/Model";
 
@@ -22,6 +22,9 @@ export function getModel(modelName: string) {
       });
       return groq(modelName);
     case "ollama":
+      const ollama = createOllama({
+        baseURL: `${getSettings().ollamaUrl}/api`,
+      });
       return ollama(modelName);
     case "openrouter":
       const openrouter = createOpenRouter({

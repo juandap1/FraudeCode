@@ -13,9 +13,16 @@ export default function App() {
       useFraudeStore.setState({ started: true });
       log("App Started...");
     }
-    // if (key.ctrl) {
-    //   process.exit(0);
-    // }
+    // Handle escape key to interrupt the agent
+    if (key.escape && status === 1) {
+      try {
+        useFraudeStore.getState().interruptAgent();
+        log("User pressed escape - interrupting agent");
+      } catch {
+        // Ignore abort errors
+        log("Agent interrupted (caught error)");
+      }
+    }
   });
   return !started ? (
     <IntroComponent />
