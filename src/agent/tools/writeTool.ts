@@ -18,10 +18,10 @@ const writeTool = tool({
     const stats = pendingChanges.getDiffStats(change.diff);
     updateOutput(
       "toolCall",
-      `Staged write for ${projectPath(path)} (+${stats.added} / -${stats.removed} lines)`,
+      `Created ${projectPath(path)} (+${stats.added} / -${stats.removed})`,
       { dontOverride: true },
     );
-    return { success: true, pending: true };
+    return { success: true };
   },
 });
 

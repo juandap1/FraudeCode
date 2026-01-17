@@ -160,8 +160,8 @@ export default function ConfirmationView() {
         {filePaths.map((path) => {
           const changes = groupedChanges[path];
           const type = changes?.[0]?.type || "unknown";
-          // Combine diffs or just take the first one (usually one per file)
-          const diffContent = changes?.[0]?.diff || "";
+          // Combine diffs if multiple changes to same file
+          const diffContent = changes?.map((c) => c.diff).join("\n") || "";
 
           return (
             <Box

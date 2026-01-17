@@ -19,7 +19,7 @@ const editTool = tool({
     new_content: z.string().describe("The new content of the file"),
   }),
   execute: async ({ path, old_content, new_content }) => {
-    const fileContent = await Bun.file(path).text();
+    const fileContent = await pendingChanges.getLatestContent(path);
     if (!fileContent.includes(old_content)) {
       throw new Error("Old content does not match file");
     }
@@ -29,10 +29,10 @@ const editTool = tool({
     const stats = pendingChanges.getDiffStats(change.diff);
     updateOutput(
       "toolCall",
-      `Staged edit for ${projectPath(path)} (+${stats.added} / -${stats.removed} lines)`,
+      `Edited ${projectPath(path)} (+${stats.added} / -${stats.removed})`,
       { dontOverride: true },
     );
-    return { success: true, pending: true };
+    return { success: true };
   },
 });
 

@@ -20,7 +20,7 @@ class PendingChangesManager {
     newContent: string,
     type: "edit" | "write",
   ): Promise<PendingChange> {
-    const originalContent = type === "edit" ? await Bun.file(path).text() : "";
+    const originalContent = await this.getLatestContent(path);
 
     // Create unified diff
     // For new files, originalContent is empty string.
@@ -29,8 +29,8 @@ class PendingChangesManager {
       projectPath(path),
       originalContent || "",
       newContent,
-      type === "edit" ? "Original" : "New File",
-      type === "edit" ? "Modified" : "New Content",
+      originalContent ? "Original" : "New File",
+      originalContent ? "Modified" : "New Content",
       { context: 2 },
     );
 
@@ -112,6 +112,28 @@ class PendingChangesManager {
   public clear() {
     this.changes.clear();
   }
+  /**
+   * Gets the content of a file, accounting for any pending changes.
+   * If there are pending changes, returns the new content of the most recent change.
+   * Otherwise, reads the file from disk.
+   */
+  public async getLatestContent(path: string): Promise<string> {
+    // Check pending changes first (reverse order to find latest)
+    const changes = Array.from(this.changes.values()).reverse();
+    const latestChange = changes.find((c) => c.path === path);
+
+    if (latestChange) {
+      return latestChange.newContent;
+    }
+
+    // If no pending changes, read from disk
+    const file = Bun.file(path);
+    if (await file.exists()) {
+      return await file.text();
+    }
+    return "";
+  }
+
   public getDiffStats(diff: string): { added: number; removed: number } {
     const lines = diff.split("\n");
     let added = 0;
