@@ -6,7 +6,7 @@ import useFraudeStore from "../store/useFraudeStore";
 import IntroComponent from "./IntroComponent";
 import LoaderComponent from "./LoaderComponent";
 export default function App() {
-  const { status, started } = useFraudeStore();
+  const { status, started, updateOutput } = useFraudeStore();
 
   useInput((input, key) => {
     if (key.return && !started) {
@@ -15,13 +15,12 @@ export default function App() {
     }
     // Handle escape key to interrupt the agent
     if (key.escape && status === 1) {
-      try {
-        useFraudeStore.getState().interruptAgent();
-        log("User pressed escape - interrupting agent");
-      } catch {
-        // Ignore abort errors
-        log("Agent interrupted (caught error)");
-      }
+      useFraudeStore.getState().interruptAgent();
+      log("User pressed escape - interrupting agent");
+      updateOutput(
+        "interrupted",
+        (useFraudeStore.getState().elapsedTime / 10).toFixed(1),
+      );
     }
   });
   return !started ? (

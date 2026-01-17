@@ -38,7 +38,6 @@ export default async function QueryHandler(query: string) {
 
   const agent = new Agent({
     model: "llama3.1:latest",
-
     systemPrompt: "You are a helpful assistant.",
     tools: { readTool, bashTool, writeTool, editTool, grepTool, globTool },
     temperature: 0.7,
@@ -63,29 +62,13 @@ export default async function QueryHandler(query: string) {
       handleStreamChunk(chunk as Record<string, unknown>);
     }
   } catch (error) {
-    // Check if this is an AbortError - these are expected and should be handled gracefully
-    if (
-      error instanceof Error &&
-      (error.name === "AbortError" ||
-        error.message === "The operation was aborted.")
-    ) {
-      log("Stream aborted by user");
-    } else if (error instanceof DOMException && error.code === 20) {
-      // DOMException with code 20 is also an AbortError
-      log("Stream aborted by user");
-    } else {
-      log(error);
-      updateOutput(
-        "error",
-        `Error: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    log(error);
+    updateOutput(
+      "error",
+      `Error: ${error instanceof Error ? error.message : String(error)}`,
+    );
   } finally {
     // Always reset status when done (whether success, error, or abort)
-    updateOutput(
-      "interrupted",
-      (useFraudeStore.getState().elapsedTime / 10).toFixed(1),
-    );
     useFraudeStore.setState({
       status: 0,
       abortController: null,
