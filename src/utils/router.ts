@@ -19,6 +19,14 @@ export interface WebSocketHandler {
 
 export class BunApiRouter {
   private static routers = new Map<string, BunApiRouter>();
+  private static _shared: BunApiRouter;
+
+  public static get shared(): BunApiRouter {
+    if (!this._shared) {
+      this._shared = new BunApiRouter();
+    }
+    return this._shared;
+  }
 
   public static getRouter(id: string): BunApiRouter | undefined {
     return this.routers.get(id);
@@ -81,6 +89,19 @@ export class BunApiRouter {
     path: string,
     handler: (req: Request & { params: Record<string, string> }) => any,
   ) {
+    // Check for duplicates
+    const duplicate = this.routes.find(
+      (r) => r.method === method && r.path === path,
+    );
+
+    if (duplicate) {
+      updateOutput(
+        "log",
+        `[Router] Warning: Duplicate route registration attempted: ${method} ${path}. skipping.`,
+      );
+      return;
+    }
+
     this.routes.push({ method, path, handler: handler as any });
   }
 

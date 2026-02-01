@@ -1,8 +1,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import type { Command } from "@/types/CommandDefinition";
 import log from "@/utils/logger";
-import { Settings } from "@/config/settings";
+import { Settings, UpdateSettings } from "@/config/settings";
+import { BunApiRouter } from "@/utils/router";
+import useFraudeStore from "@/store/useFraudeStore";
+import type { PluginContext } from "@/types/PluginContext";
+import Agent from "@/agent/agent";
 
 export class PluginLoader {
   private pluginsDirs: string[];
@@ -17,7 +22,8 @@ export class PluginLoader {
 
     this.pluginsDirs = [
       path.resolve(import.meta.dir, "../../plugins"), // Plugin folder in the source/package root
-      path.resolve(process.cwd(), "./plugins"), // Local plugins in the current working directory
+      path.resolve(process.cwd(), ".fraude", "plugins"), // Local plugins in the current working directory
+      path.resolve(os.homedir(), "fraude", "plugins"), // Global plugins in the home directory
     ];
 
     if (configDir) {
@@ -40,6 +46,25 @@ export class PluginLoader {
   async loadPlugins(): Promise<Command[]> {
     const allCommands: Command[] = [];
     const loadedPluginNames = new Set<string>();
+
+    const context: PluginContext = {
+      log: log,
+      Router: BunApiRouter,
+      router: BunApiRouter.shared,
+      Agent: Agent,
+      settings: {
+        get: (key) => Settings.getInstance().get(key as any),
+        getAll: () => Settings.getInstance().getAll(),
+        update: async (updates) => {
+          await UpdateSettings(updates);
+        },
+      },
+      ui: {
+        updateOutput: (type, content) =>
+          useFraudeStore.getState().updateOutput(type, content),
+      },
+      utils: {},
+    };
 
     for (const dir of this.pluginsDirs) {
       try {
@@ -64,10 +89,20 @@ export class PluginLoader {
             const pluginModule = await import(entryPoint);
 
             if (pluginModule.default) {
-              if (Array.isArray(pluginModule.default)) {
-                allCommands.push(...pluginModule.default);
+              let commands: Command | Command[];
+
+              if (typeof pluginModule.default === "function") {
+                // Context-aware plugin
+                commands = await pluginModule.default(context);
               } else {
-                allCommands.push(pluginModule.default);
+                // Legacy static object plugin
+                commands = pluginModule.default;
+              }
+
+              if (Array.isArray(commands)) {
+                allCommands.push(...commands);
+              } else {
+                allCommands.push(commands);
               }
               loadedPluginNames.add(entry.name);
               log(`Loaded plugin: ${entry.name} from ${dir}`);

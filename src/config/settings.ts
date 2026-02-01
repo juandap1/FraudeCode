@@ -6,23 +6,7 @@ import { getConfigDir } from "../utils/paths";
 import { ModelSchema, parseModelUniqueId } from "../types/Model";
 import type { TokenUsage } from "@/types/TokenUsage";
 import useSettingsStore from "@/store/useSettingsStore";
-
-export const SettingsSchema = z.object({
-  lastOpened: z.iso.datetime().optional(),
-  ollamaUrl: z.string().default("http://localhost:11434"),
-  primaryModel: z.string().default("qwen3:8b|ollama"),
-  secondaryModel: z.string().default("llama3.1:latest|ollama"),
-  models: z.array(ModelSchema).default([]),
-  history: z.array(z.string()).default([]),
-  openrouter_api_key: z.string().optional(),
-  groq_api_key: z.string().optional(),
-  mistral_api_key: z.string().optional(),
-  cerebras_api_key: z.string().optional(),
-  google_api_key: z.string().optional(),
-  pluginSettings: z.any().default({}),
-});
-
-type Config = z.infer<typeof SettingsSchema>;
+import { SettingsSchema, type Config } from "./schema";
 
 class Settings {
   private static instance: Settings | null = null;

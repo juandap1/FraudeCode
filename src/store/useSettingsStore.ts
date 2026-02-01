@@ -1,10 +1,6 @@
 import { create } from "zustand";
-import {
-  Settings,
-  UpdateSettings,
-  SettingsSchema,
-  type Config,
-} from "../config/settings";
+import { Settings, UpdateSettings } from "../config/settings";
+import { SettingsSchema, type Config } from "../config/schema";
 
 interface SettingsActions {
   setOllamaUrl: (url: string) => void;
