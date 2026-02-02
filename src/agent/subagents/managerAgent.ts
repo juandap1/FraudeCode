@@ -3,7 +3,7 @@ import Agent from "../agent";
 import planTool from "../tools/planTool";
 import todoTool from "../tools/todoTool";
 import researchSubAgentTool from "../subagents/researchSubAgent";
-import managerPrompt from "../prompts/PlannerPrompt.txt";
+import managerPrompt from "../prompts/PlannerPrompt.txt" with { type: "text" };
 
 let _managerAgent: Agent | null = null;
 

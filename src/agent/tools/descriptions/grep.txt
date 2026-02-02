@@ -1,3 +1,5 @@
+Search for a chunk of text in the codebase using grep. Use this tool when looking for a specific pattern in the codebase.
+
 - Fast content search tool that works with any codebase size
 - Searches file contents using regular expressions
 - Supports full regex syntax (eg. "log.*Error", "function\s+\w+", etc.)

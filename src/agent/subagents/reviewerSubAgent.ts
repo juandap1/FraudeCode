@@ -6,7 +6,7 @@ import useSettingsStore from "@/store/useSettingsStore";
 import todoTool from "../tools/todoTool";
 import testRunnerTool from "../tools/testRunnerTool";
 import testTool from "../tools/testTool";
-import ReviewerPrompt from "../prompts/ReviewerPrompt.txt";
+import ReviewerPrompt from "../prompts/ReviewerPrompt.txt" with { type: "text" };
 
 let _reviewerSubAgent: Agent | null = null;
 

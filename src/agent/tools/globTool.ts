@@ -1,7 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import useFraudeStore from "@/store/useFraudeStore";
-import DESCRIPTION from "./descriptions/glob.txt";
+import DESCRIPTION from "./descriptions/glob.txt" with { type: "text" };
 import { Glob } from "bun";
 
 const { updateOutput } = useFraudeStore.getState();

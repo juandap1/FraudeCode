@@ -1,6 +1,5 @@
 import { Box, Text } from "ink";
 import Gradient from "ink-gradient";
-import BigText from "ink-big-text";
 
 const INTRO_THEME = {
   primary: "#FFB6C1",
@@ -21,10 +20,28 @@ const INTRO_THEME = {
   ],
 };
 
+const LOGO_FRAUDE = `
+  ███████╗██████╗  █████╗ ██╗   ██╗██████╗ ███████╗
+  ██╔════╝██╔══██╗██╔══██╗██║   ██║██╔══██╗██╔════╝
+  █████╗  ██████╔╝███████║██║   ██║██║  ██║█████╗  
+  ██╔══╝  ██╔══██╗██╔══██║██║   ██║██║  ██║██╔══╝  
+  ██║     ██║  ██║██║  ██║╚██████╔╝██████╔╝███████╗
+  ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝
+`;
+
+const LOGO_CODE = `
+   ██████╗ ██████╗ ██████╗ ███████╗
+  ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+  ██║     ██║   ██║██║  ██║█████╗  
+  ██║     ██║   ██║██║  ██║██╔══╝  
+  ╚██████╗╚██████╔╝██████╔╝███████╗
+   ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝
+`;
+
 export default function IntroComponent() {
   return (
     <Box flexDirection="column">
-      <Box paddingX={1}>
+      <Box paddingX={1} marginBottom={1}>
         <Text color={INTRO_THEME.primaryDim}>
           FRAUDE CODE <Text color={INTRO_THEME.dim}>·</Text>{" "}
           <Text italic>Agentic AI Assistant</Text>
@@ -32,11 +49,11 @@ export default function IntroComponent() {
       </Box>
 
       <Gradient colors={INTRO_THEME.gradient}>
-        <BigText text="Fraude" font="block" />
-        <BigText text="Code" font="block" />
+        <Text bold>{LOGO_FRAUDE}</Text>
+        <Text bold>{LOGO_CODE}</Text>
       </Gradient>
 
-      <Box flexDirection="column">
+      <Box flexDirection="column" marginTop={1}>
         <Text color={INTRO_THEME.dim}>Ready to build something amazing?</Text>
         <Box marginTop={1}>
           <Text color={INTRO_THEME.dim}>

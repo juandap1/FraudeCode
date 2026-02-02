@@ -40,3 +40,5 @@ debug.log
 *.db-wal
 plugins/learn/learning.db
 plugins/informed/data
+
+fraude

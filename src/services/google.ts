@@ -6,7 +6,7 @@ const getSettings = () => useSettingsStore.getState();
 
 class GoogleClient {
   async syncGoogleModels() {
-    if (!getSettings().google_api_key) {
+    if (!getSettings().google_api_key && !process.env.GOOGLE_API_KEY) {
       return;
     }
     const savedModels = getSettings().models;

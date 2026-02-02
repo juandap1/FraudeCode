@@ -1,7 +1,7 @@
 import useSettingsStore from "@/store/useSettingsStore";
 import Agent from "../agent";
 import researchSubAgentTool from "../subagents/researchSubAgent";
-import fastAgentPrompt from "../prompts/FastPrompt.txt";
+import fastAgentPrompt from "../prompts/FastPrompt.txt" with { type: "text" };
 import writeTool from "../tools/writeTool";
 import editTool from "../tools/editTool";
 import readTool from "../tools/readTool";

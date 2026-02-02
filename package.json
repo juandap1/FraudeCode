@@ -3,6 +3,9 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "bin": {
+    "fraude": "./src/index.tsx"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/diff": "^8.0.0",
@@ -22,6 +25,7 @@
     "@openrouter/ai-sdk-provider": "^1.5.4",
     "@qdrant/js-client-rest": "^1.16.2",
     "@tavily/ai-sdk": "^0.4.1",
+    "@vscode/ripgrep": "^1.17.0",
     "ai": "^6.0.33",
     "diff": "^8.0.2",
     "fast-xml-parser": "^5.3.4",
@@ -41,8 +45,8 @@
   },
   "scripts": {
     "dev": "bun run src/index.tsx",
-    "build": "bun build src/index.tsx --outdir dist --target bun",
-    "start": "bun run dist/index.js",
+    "build": "bun build src/index.tsx --target bun --compile --minify --sourcemap --outfile fraude",
+    "start": "./fraude",
     "type-check": "tsc --noEmit"
   }
 }

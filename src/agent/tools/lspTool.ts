@@ -5,7 +5,7 @@ import { getLSPClient } from "@/utils/lspClient";
 import pendingChanges from "@/agent/pendingChanges";
 import { projectPath } from "@/utils";
 import useFraudeStore from "@/store/useFraudeStore";
-import DESCRIPTION from "./descriptions/lsp.txt";
+import DESCRIPTION from "./descriptions/lsp.txt" with { type: "text" };
 
 const { updateOutput } = useFraudeStore.getState();
 

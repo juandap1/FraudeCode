@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import path from "path";
 import useFraudeStore from "@/store/useFraudeStore";
-import DESCRIPTION from "./descriptions/todo.txt";
+import DESCRIPTION from "./descriptions/todo.txt" with { type: "text" };
 
 const { updateOutput } = useFraudeStore.getState();
 

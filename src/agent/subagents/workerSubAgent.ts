@@ -6,7 +6,7 @@ import editTool from "../tools/editTool";
 import bashTool from "../tools/bashTool";
 import todoTool from "../tools/todoTool";
 import useSettingsStore from "@/store/useSettingsStore";
-import WorkerPrompt from "../prompts/WorkerPrompt.txt";
+import WorkerPrompt from "../prompts/WorkerPrompt.txt" with { type: "text" };
 
 let _workerSubAgent: Agent | null = null;
 

@@ -4,7 +4,7 @@ import useFraudeStore from "@/store/useFraudeStore";
 import { projectPath } from "@/utils";
 import pendingChanges from "@/agent/pendingChanges";
 
-import DESCRIPTION from "./descriptions/edit.txt";
+import DESCRIPTION from "./descriptions/edit.txt" with { type: "text" };
 const { updateOutput } = useFraudeStore.getState();
 
 const editTool = tool({

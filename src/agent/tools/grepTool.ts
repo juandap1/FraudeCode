@@ -1,8 +1,9 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { rgPath } from "@vscode/ripgrep";
 import useFraudeStore from "@/store/useFraudeStore";
 import pendingChanges from "@/agent/pendingChanges";
-import DESCRIPTION from "./descriptions/grep.txt";
+import DESCRIPTION from "./descriptions/grep.txt" with { type: "text" };
 
 const { updateOutput } = useFraudeStore.getState();
 
@@ -47,19 +48,19 @@ const grepTool = tool({
     const { resolve } = await import("path");
     const cwd = path ? resolve(process.cwd(), path) : process.cwd();
 
-    // Step 1: Attempt Git Grep (Fastest + Respects .gitignore)
+    // Step 1: Attempt RipGrep (Fastest + Respects .gitignore)
+    const rgResult = await runRipGrep(pattern, cwd, include);
+    if (rgResult) return formatOutput(rgResult);
+
+    // Step 2: Fallback to Git Grep
     const gitResult = await runGitGrep(pattern, cwd, include);
     if (gitResult) return formatOutput(gitResult);
 
-    // Step 2: Attempt System Grep (Fast, Standard)
+    // Step 3: Attempt System Grep (Fast, Standard)
     const sysResult = await runSystemGrep(pattern, cwd, include);
 
     // Combine results (prefer git/system, fallback to bun)
     let results = sysResult || (await runBunGrep(pattern, cwd, include));
-
-    if (gitResult) {
-      results = gitResult;
-    }
 
     // --- Merge with Pending Changes ---
     const regex = new RegExp(pattern);
@@ -120,6 +121,42 @@ type MatchResult = {
   content: string;
   mtime: number;
 };
+
+// --- Strategy 1: RipGrep ---
+async function runRipGrep(
+  pattern: string,
+  cwd: string,
+  include?: string,
+): Promise<MatchResult[] | null> {
+  try {
+    // --vimgrep: file:line:column:text
+    // --color never: no ANSI codes
+    // --smart-case: case insensitive unless pattern has uppercase
+    const args = [
+      rgPath,
+      "--line-number",
+      "--no-heading",
+      "--color",
+      "never",
+      "--smart-case",
+    ];
+
+    // Add include pattern if specified
+    if (include) {
+      args.push("-g", include);
+    }
+
+    args.push(pattern, ".");
+
+    const proc = Bun.spawn(args, { cwd, stderr: "pipe" });
+    const text = await new Response(proc.stdout).text();
+
+    if ((await proc.exited) !== 0 && !text) return null; // No matches or error
+    return await parseAndStat(text, cwd);
+  } catch (e) {
+    return null;
+  }
+}
 
 // --- Strategy 1: Git Grep ---
 async function runGitGrep(

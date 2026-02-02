@@ -8,7 +8,10 @@ import CommandCenter from "@/commands";
 import { addHistory } from "@/config/settings";
 import CommandSuggestions from "./CommandSuggestions";
 import FileSuggestions from "./FileSuggestions";
-import { getFileSuggestions } from "@/utils/fileSuggestions";
+import {
+  getFileSuggestions,
+  type FileSuggestion,
+} from "@/utils/fileSuggestions";
 import { shortenPath } from "@/utils";
 
 import { getModelDisplayId } from "@/types/Model";
@@ -20,7 +23,7 @@ const InputBoxComponent = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [currentInput, setCurrentInput] = useState("");
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [allFiles, setAllFiles] = useState<string[]>([]);
+  const [allFiles, setAllFiles] = useState<FileSuggestion[]>([]);
   const [scrollOffset, setScrollOffset] = useState(0);
 
   useEffect(() => {
@@ -65,7 +68,7 @@ const InputBoxComponent = () => {
   const fileDropdownSuggestions = useMemo(() => {
     if (!isFileMode || !allFiles.length) return [];
     return allFiles.filter((f) =>
-      f.toLowerCase().includes(fileQuery!.toLowerCase()),
+      f.path.toLowerCase().includes(fileQuery!.toLowerCase()),
     );
   }, [isFileMode, allFiles, fileQuery]);
   const dropdownSuggestions = useMemo(() => {
@@ -114,7 +117,7 @@ const InputBoxComponent = () => {
     if (isFileMode && fileDropdownSuggestions.length > 0) {
       const selectedFile = fileDropdownSuggestions[selectedIndex];
       if (selectedFile) {
-        return [filePrefix + selectedFile + " "];
+        return [filePrefix + selectedFile.path + " "];
       }
     }
 

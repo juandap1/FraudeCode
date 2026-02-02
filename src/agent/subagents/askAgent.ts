@@ -1,6 +1,6 @@
 import useSettingsStore from "@/store/useSettingsStore";
 import Agent from "../agent";
-import askPrompt from "../prompts/AskPrompt.txt";
+import askPrompt from "../prompts/AskPrompt.txt" with { type: "text" };
 import grepTool from "../tools/grepTool";
 import globTool from "../tools/globTool";
 import readTool from "../tools/readTool";

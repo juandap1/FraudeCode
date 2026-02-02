@@ -18,13 +18,15 @@ interface CerebrasModel {
 
 class CerebrasClient {
   async syncCerebrasModels() {
-    if (!getSettings().cerebras_api_key) {
+    const apiKey =
+      getSettings().cerebras_api_key || process.env.CEREBRAS_API_KEY;
+    if (!apiKey) {
       return;
     }
     const url = `https://api.cerebras.ai/v1/models`;
     const options = {
       method: "GET",
-      headers: { Authorization: `Bearer ${getSettings().cerebras_api_key}` },
+      headers: { Authorization: `Bearer ${apiKey}` },
     };
     const response = await fetch(url, options);
     if (!response.ok) {

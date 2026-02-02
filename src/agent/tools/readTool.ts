@@ -4,7 +4,7 @@ import path from "path";
 import { projectPath } from "@/utils";
 import useFraudeStore from "@/store/useFraudeStore";
 import pendingChanges from "@/agent/pendingChanges";
-import DESCRIPTION from "./descriptions/read.txt";
+import DESCRIPTION from "./descriptions/read.txt" with { type: "text" };
 
 const { updateOutput } = useFraudeStore.getState();
 

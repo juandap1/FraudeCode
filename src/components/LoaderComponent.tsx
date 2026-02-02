@@ -6,7 +6,7 @@ import { THEME } from "../theme";
 
 const LoaderComponent = () => {
   const [i, setFrame] = useState(0);
-  const frames = (text: string) => [
+  const getFrames = (text: string) => [
     `·  ${text}.  `,
     `•  ${text}.. `,
     `●  ${text}...`,
@@ -18,8 +18,9 @@ const LoaderComponent = () => {
     let timer: NodeJS.Timeout | null = null;
 
     if (status === 1) {
+      const frameCount = getFrames("").length;
       timer = setInterval(() => {
-        setFrame((prevIndex) => (prevIndex + 1) % frames.length);
+        setFrame((prevIndex) => (prevIndex + 1) % frameCount);
 
         const currentElapsed = useFraudeStore.getState().elapsedTime;
         useFraudeStore.setState({
@@ -36,7 +37,7 @@ const LoaderComponent = () => {
   }, [status]);
 
   const currentStatusText = statusText || "Pondering";
-  const currentFrames = frames(currentStatusText);
+  const currentFrames = getFrames(currentStatusText);
 
   return (
     <Box marginY={0}>

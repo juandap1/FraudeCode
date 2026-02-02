@@ -1,7 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import useFraudeStore from "@/store/useFraudeStore";
-import DESCRIPTION from "./descriptions/bash.txt";
+import DESCRIPTION from "./descriptions/bash.txt" with { type: "text" };
 
 const { updateOutput } = useFraudeStore.getState();
 

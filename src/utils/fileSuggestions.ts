@@ -1,62 +1,111 @@
-import { Glob } from "bun";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
+export interface FileSuggestion {
+  path: string;
+  type: "file" | "dir";
+  childCount?: number;
+}
+
 // Cache for file list to avoid re-scanning on every keystroke
-let fileCache: string[] | null = null;
+let fileCache: FileSuggestion[] | null = null;
 let lastScanTime = 0;
 const SCAN_INTERVAL = 10000; // 10 seconds
+const MAX_FILES = 50000; // Increased limit for large repos
 
-export async function getFileSuggestions(cwd: string): Promise<string[]> {
+const IGNORED_DIRS = new Set([
+  "node_modules",
+  ".git",
+  ".next",
+  "dist",
+  ".bun",
+  "coverage",
+  "build",
+  ".cache",
+]);
+
+export async function getFileSuggestions(
+  cwd: string,
+): Promise<FileSuggestion[]> {
   const now = Date.now();
   if (fileCache && now - lastScanTime < SCAN_INTERVAL) {
     return fileCache;
   }
 
+  const results: FileSuggestion[] = [];
+
   try {
-    // Attempt to use Bun.Glob for efficient scanning
-    const glob = new Glob("**/*");
-    const files: string[] = [];
-
-    // Scan recursively
-    for await (const file of glob.scan({ cwd, dot: false, onlyFiles: false })) {
-      // Exclude specific directories by checking path segments to avoid false positives (e.g. "distribution" containing "dist")
-      const parts = file.split(path.sep);
-      if (
-        parts.some(
-          (p) =>
-            p === "node_modules" ||
-            p === ".git" ||
-            p === ".next" ||
-            p === "dist" ||
-            p === ".bun" ||
-            p === "coverage" ||
-            p === "build",
-        )
-      ) {
-        continue;
-      }
-      files.push(file);
-      // Limit to prevent performance issues in huge repos
-      if (files.length >= 2000) break;
-    }
-
-    fileCache = files;
+    await scanDirectory(cwd, "", results);
+    fileCache = results;
     lastScanTime = now;
-    return files;
+    return results;
   } catch (error) {
-    // Fallback or error handling
-    console.error("Error scanning files with Bun.Glob:", error);
+    console.error("Error scanning files:", error);
     return [];
   }
 }
 
-export function filterFiles(files: string[], input: string): string[] {
+// Returns the number of items in the directory scanned
+async function scanDirectory(
+  basePath: string,
+  relativePath: string,
+  results: FileSuggestion[],
+): Promise<number> {
+  if (results.length >= MAX_FILES) return 0;
+
+  const currentDir = path.join(basePath, relativePath);
+
+  try {
+    const entries = await readdir(currentDir, { withFileTypes: true });
+
+    // Filter out ignored items immediately
+    const validEntries = entries.filter(
+      (entry) => !IGNORED_DIRS.has(entry.name),
+    );
+
+    for (const entry of validEntries) {
+      if (results.length >= MAX_FILES) break;
+
+      const entryName = entry.name;
+      const entryRelativePath = relativePath
+        ? path.join(relativePath, entryName)
+        : entryName;
+
+      if (entry.isDirectory()) {
+        const suggestion: FileSuggestion = {
+          path: entryRelativePath,
+          type: "dir",
+          childCount: 0, // Will be updated after recursion
+        };
+        results.push(suggestion);
+
+        // Recursively scan and get the count
+        const count = await scanDirectory(basePath, entryRelativePath, results);
+        suggestion.childCount = count;
+      } else {
+        results.push({
+          path: entryRelativePath,
+          type: "file",
+        });
+      }
+    }
+
+    return validEntries.length;
+  } catch (err) {
+    // Permission denied or other error
+    return 0;
+  }
+}
+
+export function filterFiles(
+  files: FileSuggestion[],
+  input: string,
+): FileSuggestion[] {
   if (!input) return [];
 
   // Input might be "@src/u" -> we want to match "src/utils"
   const query = input.startsWith("@") ? input.slice(1) : input;
   const lowerQuery = query.toLowerCase();
 
-  return files.filter((f) => f.toLowerCase().includes(lowerQuery));
+  return files.filter((f) => f.path.toLowerCase().includes(lowerQuery));
 }
