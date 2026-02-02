@@ -36,32 +36,33 @@ export function getModel(modelIdentifier: string) {
   switch (type) {
     case "groq":
       const groq = createGroq({
-        apiKey: getSettings().groq_api_key,
+        apiKey: getSettings().groq_api_key || process.env.GROQ_API_KEY,
       });
       return groq(name);
     case "ollama":
       const ollama = createOllama({
-        baseURL: `${getSettings().ollamaUrl}/api`,
+        baseURL: `${getSettings().ollamaUrl || process.env.OLLAMA_URL || "http://localhost:11434"}/api`,
       });
       return ollama(name);
     case "openrouter":
       const openrouter = createOpenRouter({
-        apiKey: getSettings().openrouter_api_key,
+        apiKey:
+          getSettings().openrouter_api_key || process.env.OPENROUTER_API_KEY,
       });
       return openrouter(name);
     case "cerebras":
       const cerebras = createCerebras({
-        apiKey: getSettings().cerebras_api_key,
+        apiKey: getSettings().cerebras_api_key || process.env.CEREBRAS_API_KEY,
       });
       return cerebras(name);
     case "mistral":
       const mistral = createMistral({
-        apiKey: getSettings().mistral_api_key,
+        apiKey: getSettings().mistral_api_key || process.env.MISTRAL_API_KEY,
       });
       return mistral(name);
     case "google":
       const google = createGoogleGenerativeAI({
-        apiKey: getSettings().google_api_key,
+        apiKey: getSettings().google_api_key || process.env.GOOGLE_API_KEY,
       });
       return google(name);
     default:

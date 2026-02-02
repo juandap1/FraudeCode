@@ -78,7 +78,6 @@ export class PluginLoader {
 
       for (const entry of entries) {
         if (entry.isDirectory()) {
-          // Avoid loading the same plugin twice if it exists in multiple search paths
           if (loadedPluginNames.has(entry.name)) continue;
 
           const pluginPath = path.join(dir, entry.name);

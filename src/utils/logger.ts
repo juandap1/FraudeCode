@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { getConfigDir } from "./paths";
 
-const getLogPath = () => {
+export const getLogPath = () => {
   const configDir = getConfigDir("fraude-code");
   if (!fs.existsSync(configDir)) {
     fs.mkdirSync(configDir, { recursive: true });

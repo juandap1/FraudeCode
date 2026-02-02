@@ -20,13 +20,14 @@ interface MistralModel {
 
 class MistralClient {
   async syncMistralModels() {
-    if (!getSettings().mistral_api_key) {
+    const apiKey = getSettings().mistral_api_key || process.env.MISTRAL_API_KEY;
+    if (!apiKey) {
       return;
     }
     const url = `https://api.mistral.ai/v1/models`;
     const options = {
       method: "GET",
-      headers: { Authorization: `Bearer ${getSettings().mistral_api_key}` },
+      headers: { Authorization: `Bearer ${apiKey}` },
     };
     const response = await fetch(url, options);
     if (!response.ok) {

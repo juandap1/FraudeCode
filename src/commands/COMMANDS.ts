@@ -10,9 +10,11 @@ import ollamaCommand from "./ollama";
 import sessionCommands from "./session";
 import usageCommand from "./usage";
 import serveCommand from "./serve";
+import logCommand from "./log";
 
 const COMMANDS: Command[] = [
   usageCommand,
+  logCommand,
   serveCommand,
   sessionCommands,
   modelCommands, //starts with model

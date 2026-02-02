@@ -2,7 +2,7 @@
 
 import { render } from "ink";
 import App from "./components/App";
-import { resetLog } from "./utils/logger";
+import log, { resetLog } from "./utils/logger";
 import { Settings } from "./config/settings";
 import useSettingsStore from "./store/useSettingsStore";
 import OllamaClient from "@/services/ollama";
@@ -55,6 +55,25 @@ const syncModels = async () => {
 async function main() {
   resetLog();
   console.clear();
+
+  try {
+    const envFile = Bun.file(".env");
+    if (await envFile.exists()) {
+      const envText = await envFile.text();
+      const lines = envText.split("\n");
+      for (const line of lines) {
+        const [key, ...valueParts] = line.trim().split("=");
+        if (key && !key.startsWith("#") && valueParts.length > 0) {
+          const value = valueParts.join("=").replace(/^["']|["']$/g, "");
+          process.env[key.trim()] = value;
+          log(`Loaded env var: ${key.trim()}`);
+        }
+      }
+    }
+  } catch (e) {
+    log(`Failed to load .env file: ${e}`);
+  }
+
   await Settings.init();
   useSettingsStore.getState().syncWithSettings();
   await CommandCenter.loadPlugins();

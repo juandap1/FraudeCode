@@ -46,7 +46,7 @@
   "scripts": {
     "dev": "bun run src/index.tsx",
     "build": "bun build src/index.tsx --target bun --compile --minify --sourcemap --outfile fraude",
-    "start": "bun run dist/index.js",
+    "start": "./fraude",
     "type-check": "tsc --noEmit"
   }
 }
