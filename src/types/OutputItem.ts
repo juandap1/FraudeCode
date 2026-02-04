@@ -13,6 +13,7 @@ export type OutputItemType =
   | "toolCall"
   | "agentText"
   | "modelSelect"
+  | "knowledge"
   | "interactive-server";
 
 export interface OutputItem {
