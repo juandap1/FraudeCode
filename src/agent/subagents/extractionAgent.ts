@@ -8,6 +8,8 @@ let _extractionAgent: Agent | null = null;
 
 const EXTRACTION_PROMPT = `You are a knowledge extraction agent. Analyze the conversation and extract key learnings.
 
+Do not extract facts about your own capabilities or the tools you use.
+
 Output a JSON array of facts with this structure:
 [
   {

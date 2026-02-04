@@ -121,7 +121,7 @@ const setModel = async (args: string[]) => {
 const modelSetCommands: Command = {
   name: "model",
   description: "Set active model(s) by role",
-  usage: "/model <model-name> [role]",
+  usage: "/model <model-name> <role>",
   action: setModel,
   subcommands: [
     {

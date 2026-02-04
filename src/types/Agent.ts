@@ -54,9 +54,6 @@ export interface AgentConfig {
   /** Callback for tool calls */
   onToolCall?: (toolCall: ToolCallInfo) => void;
 
-  /** Callback for tool results */
-  onToolResult?: (result: ToolResultInfo) => void;
-
   /** Callback for step completion */
   onStepComplete?: (step: StepInfo) => void;
 
@@ -82,19 +79,13 @@ export interface ToolCallInfo {
   toolCallId: string;
   toolName: string;
   args: unknown;
-}
-
-export interface ToolResultInfo {
-  toolCallId: string;
-  toolName: string;
-  result: unknown;
+  result?: unknown;
 }
 
 export interface StepInfo {
   stepNumber: number;
-  text: string;
+  actions: string[];
   toolCalls: ToolCallInfo[];
-  toolResults: ToolResultInfo[];
   finishReason: string;
 }
 
@@ -115,11 +106,8 @@ export interface AgentResponse {
   /** All steps taken during generation (for multi-step tool use) */
   steps: StepInfo[];
 
-  /** All tool calls made during the conversation */
+  /** All tool calls (and results) made during the conversation */
   toolCalls: ToolCallInfo[];
-
-  /** All tool results from the conversation */
-  toolResults: ToolResultInfo[];
 
   /** Raw response from the provider (for advanced use cases) */
   raw?: unknown;

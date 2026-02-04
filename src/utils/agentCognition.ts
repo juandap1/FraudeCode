@@ -341,13 +341,15 @@ class AgentCognition {
     const parts: string[] = [];
 
     if (validSummaries.length > 0) {
-      parts.push("## Previous Session Context");
+      parts.push("<previous_session_context>");
       validSummaries.forEach((s) => parts.push(`- ${s.content}`));
+      parts.push("</previous_session_context>");
     }
 
     if (validDecisions.length > 0) {
-      parts.push("\n## Project Decisions");
+      parts.push("<project_decisions>");
       validDecisions.forEach((d) => parts.push(`- ${d.content}`));
+      parts.push("</project_decisions>");
     }
 
     return parts.join("\n");
@@ -596,7 +598,7 @@ class AgentCognition {
 
   private formatMessageForExtraction(m: ModelMessage): string {
     const role = m.role.toUpperCase();
-    log(JSON.stringify(m, null, 2));
+    // log(JSON.stringify(m, null, 2));
     let content = "";
 
     // Handle Assistant messages (Text + Reasoning + Tool Calls)
@@ -606,36 +608,11 @@ class AgentCognition {
           ? m.content
           : Array.isArray(m.content)
             ? m.content
-                .map((c: any) => {
-                  if (c.type === "text" || c.type === "reasoning")
-                    return c.text;
-                  else if (c.type === "tool-call") {
-                    const toolName = c.toolName;
-                    const args = JSON.stringify(c.input);
-                    return `Tool Call: ${toolName}(${args})`;
-                  }
-                  return null;
-                })
+                .map((c: any) => c.text)
                 .filter((c) => c !== null)
                 .join("\n")
             : "";
       content = textContent;
-    }
-    // Handle Tool messages (Results)
-    else if (m.role === "tool") {
-      if (Array.isArray(m.content)) {
-        content = m.content
-          .map((c: any) => {
-            const resultStr =
-              typeof c.output === "string"
-                ? c.output
-                : JSON.stringify(c.output) || "";
-            return `Tool Result (${c.toolName}): ${resultStr.slice(0, 500)}${resultStr.length > 500 ? "..." : ""}`;
-          })
-          .join("\n");
-      } else {
-        content = JSON.stringify(m.content);
-      }
     }
     // Handle User messages
     else {

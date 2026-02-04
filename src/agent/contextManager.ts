@@ -6,6 +6,7 @@ class ContextManager {
   private longTermSummary: string = "";
   private history: ModelMessage[] = [];
   private primingContext: string = "";
+  private currentQueryContext: string = "";
   private cognition: AgentCognition;
 
   constructor(initialContext: ModelMessage[] = []) {
@@ -18,9 +19,13 @@ class ContextManager {
     if (this.primingContext) {
       const primingMessage: ModelMessage = {
         role: "system",
-        content: `[Project Knowledge]\n${this.primingContext}`,
+        content: this.primingContext,
       };
-      return [primingMessage, ...this.history];
+      const queryMessage: ModelMessage = {
+        role: "system",
+        content: this.currentQueryContext,
+      };
+      return [primingMessage, queryMessage, ...this.history];
     }
     return this.history;
   }
@@ -29,15 +34,10 @@ class ContextManager {
     this.history = [];
     this.longTermSummary = "";
     this.primingContext = "";
+    this.currentQueryContext = "";
   }
 
-  processStep = (step: StepResult<ToolSet>) => {
-    if (step.response?.messages) {
-      this.addHistory(step.response.messages);
-    }
-  };
-
-  async addHistory(query: string | ModelMessage | ModelMessage[]) {
+  async addContext(query: string | ModelMessage | ModelMessage[]) {
     if (typeof query === "string") {
       this.history.push({ role: "user", content: query });
     } else if (Array.isArray(query)) {
@@ -46,11 +46,6 @@ class ContextManager {
       this.history.push(query);
     }
     return this.history;
-  }
-
-  // Backward compatibility alias
-  addContext(query: string | ModelMessage | ModelMessage[]) {
-    return this.addHistory(query);
   }
 
   // Prime context with project knowledge at session start
@@ -72,13 +67,11 @@ class ContextManager {
       if (relevantFacts.length > 0) {
         const context = relevantFacts.map((f) => `- ${f.content}`).join("\n");
         // Add as a system message before processing
-        this.history.push({
-          role: "system",
-          content: `[Relevant Knowledge]\n${context}`,
-        });
+        this.currentQueryContext = `\n<relevant_knowledge>\n${context}\n</relevant_knowledge>\n`;
       }
     } catch (e) {
       // Fail silently - context injection is optional
+      this.currentQueryContext = "";
     }
   }
 

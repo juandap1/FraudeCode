@@ -6,7 +6,6 @@ import type {
   AgentConfig,
   AgentResponse,
   ToolCallInfo,
-  ToolResultInfo,
   StepInfo,
 } from "@/types/Agent";
 import log from "@/utils/logger";
@@ -279,7 +278,7 @@ export default class Agent {
   ): Promise<AgentResponse> {
     const contextManager = this.getContextManager();
     const processedInput = resolveFileReferences(input);
-    const messages = await contextManager.addContext(processedInput);
+    const messages = [...(await contextManager.addContext(processedInput))];
     const mergedConfig = { ...this.config, ...options };
 
     const result = await generateText({
@@ -294,10 +293,7 @@ export default class Agent {
         ? stepCountIs(mergedConfig.maxSteps)
         : undefined,
       experimental_repairToolCall,
-      onStepFinish: contextManager.processStep,
     });
-
-    // Note: Context is tracked incrementally in onStepFinish for error recovery
 
     const response = this.mapResponse(result);
     await incrementModelUsage(this.rawModel, response.usage);
@@ -314,7 +310,7 @@ export default class Agent {
   ): Promise<AgentResponse> {
     const contextManager = this.getContextManager();
     const processedInput = resolveFileReferences(input);
-    const messages = await contextManager.addContext(processedInput);
+    const messages = [...(await contextManager.addContext(processedInput))];
     const mergedConfig = { ...this.config, ...options };
 
     const result = streamText({
@@ -330,10 +326,6 @@ export default class Agent {
         ? stepCountIs(mergedConfig.maxSteps)
         : undefined,
       experimental_repairToolCall,
-      onStepFinish: (step) => {
-        log(`Step finished: ${step.finishReason}`);
-        contextManager.processStep(step);
-      },
       onError: (error) => {
         log(`Stream error: ${JSON.stringify(error, null, 2)}`);
       },
@@ -371,12 +363,10 @@ export default class Agent {
         this.mapStepInfo({ ...step, stepNumber: index + 1 }),
       ) ?? [];
     const toolCalls: ToolCallInfo[] = [];
-    const toolResults: ToolResultInfo[] = [];
 
     // Aggregate all tool calls/results from steps
     for (const step of steps) {
       toolCalls.push(...step.toolCalls);
-      toolResults.push(...step.toolResults);
     }
 
     return {
@@ -385,34 +375,45 @@ export default class Agent {
       finishReason: result.finishReason ?? "unknown",
       steps,
       toolCalls,
-      toolResults,
       raw: result,
     };
   }
 
   private mapStepInfo(step: Record<string, unknown>): StepInfo {
-    const toolCalls = step.toolCalls as
-      | Array<Record<string, unknown>>
-      | undefined;
-    const toolResults = step.toolResults as
-      | Array<Record<string, unknown>>
-      | undefined;
+    const actions = [];
+
+    const toolMap = new Map<string, ToolCallInfo>();
+
+    for (const event of step.content as any[]) {
+      if (event.type === "tool-call") {
+        toolMap.set(event.toolCallId, {
+          toolCallId: event.toolCallId,
+          toolName: event.toolName,
+          args: event.input,
+        });
+      } else if (event.type === "tool-result") {
+        const toolCall = toolMap.get(event.toolCallId);
+        if (toolCall) {
+          toolCall.result = event.output;
+          actions.push("Tool Call: " + JSON.stringify(toolCall, null, 2));
+          this.getContextManager().addContext({
+            role: "assistant",
+            content: "Tool Call: " + JSON.stringify(toolCall, null, 2),
+          });
+        }
+      } else if (event.text) {
+        actions.push(event.text);
+        this.getContextManager().addContext({
+          role: "assistant",
+          content: event.text,
+        });
+      }
+    }
 
     return {
       stepNumber: (step.stepNumber as number) ?? 0,
-      text: (step.text as string) ?? "",
-      toolCalls:
-        toolCalls?.map((tc) => ({
-          toolCallId: tc.toolCallId as string,
-          toolName: tc.toolName as string,
-          args: tc.args,
-        })) ?? [],
-      toolResults:
-        toolResults?.map((tr) => ({
-          toolCallId: tr.toolCallId as string,
-          toolName: tr.toolName as string,
-          result: tr.result,
-        })) ?? [],
+      actions,
+      toolCalls: Array.from(toolMap.values()),
       finishReason: (step.finishReason as string) ?? "unknown",
     };
   }
@@ -421,39 +422,15 @@ export default class Agent {
     result: ReturnType<typeof streamText>,
     abortSignal?: AbortSignal,
   ): Promise<AgentResponse> {
-    // Consume the stream - required for the promise to resolve
     log("Starting stream consumption...");
-
-    // Track tool calls to detect loops
-    const toolCallCounts = new Map<string, number>();
-    const LOOP_THRESHOLD = 3;
 
     try {
       for await (const chunk of result.fullStream) {
-        // Check for abort between chunks
         if (abortSignal?.aborted) {
           log("Stream consumption aborted by user");
           const error = new Error("Aborted");
           error.name = "AbortError";
           throw error;
-        }
-
-        // log(JSON.stringify(chunk, null, 2));
-
-        // Detect repeated tool calls (loop detection)
-        const chunkAny = chunk as Record<string, unknown>;
-        if (chunkAny.type === "tool-call") {
-          const toolName = chunkAny.toolName as string;
-          const input = chunkAny.input;
-          const key = `${toolName}:${JSON.stringify(input)}`;
-          const count = (toolCallCounts.get(key) || 0) + 1;
-          toolCallCounts.set(key, count);
-
-          if (count >= LOOP_THRESHOLD) {
-            log(
-              `WARNING: Loop detected - ${toolName} called ${count} times with identical arguments`,
-            );
-          }
         }
 
         const usage: TokenUsage = handleStreamChunk(
@@ -462,15 +439,6 @@ export default class Agent {
         await incrementModelUsage(this.rawModel, usage);
       }
       log("Stream consumption completed.");
-
-      // Log summary of detected loops
-      for (const [key, count] of toolCallCounts) {
-        if (count >= LOOP_THRESHOLD) {
-          log(
-            `Loop summary: "${key.substring(0, 100)}..." repeated ${count} times`,
-          );
-        }
-      }
     } catch (error) {
       log(`Error during stream consumption: ${error}`);
       if (error instanceof Error) {
@@ -488,11 +456,9 @@ export default class Agent {
         this.mapStepInfo({ ...step, stepNumber: index + 1 }),
       ) ?? [];
     const toolCalls: ToolCallInfo[] = [];
-    const toolResults: ToolResultInfo[] = [];
 
     for (const step of mappedSteps) {
       toolCalls.push(...step.toolCalls);
-      toolResults.push(...step.toolResults);
     }
 
     return {
@@ -501,7 +467,6 @@ export default class Agent {
       finishReason: finishReason ?? "unknown",
       steps: mappedSteps,
       toolCalls,
-      toolResults,
       raw: result,
     };
   }
