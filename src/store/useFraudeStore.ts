@@ -38,7 +38,7 @@ interface FraudeStore {
 }
 
 const useFraudeStore = create<FraudeStore>((set, get) => ({
-  executionMode: 0,
+  executionMode: 0 as 0 | 1 | 2,
   outputItems: [],
   started: false,
   status: 0,
