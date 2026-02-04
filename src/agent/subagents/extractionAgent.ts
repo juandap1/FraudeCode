@@ -6,7 +6,7 @@ import log from "@/utils/logger";
 
 let _extractionAgent: Agent | null = null;
 
-const EXTRACTION_PROMPT = `You are a knowledge extraction agent. Analyze the conversation and extract key learnings.
+const EXTRACTION_PROMPT = `You are a knowledge extraction agent. Analyze the conversation and extract key learnings about the current state of the codebase AFTER this interaction.
 
 Do not extract facts about your own capabilities or the tools you use.
 
@@ -22,7 +22,9 @@ Output a JSON array of facts with this structure:
 ]
 
 Rules:
-- Extract ONLY explicitly stated or clearly implied information
+- Extract ONLY explicitly stated or clearly implied information about the codebase
+- DO NOT store information about test results from tool calls
+- Do NOT store information about what the user asked for
 - "decision": architectural choices, library selections, design patterns
 - "fact": learned information about the codebase structure
 - "concept": domain knowledge or technical concepts explained

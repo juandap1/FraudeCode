@@ -21,6 +21,12 @@ FraudeCode is a simple AI coding agent that can help you with your coding tasks.
     </picture>
 </p>
 
+### Graph + Vector Powered Memory
+
+FraudeCode uses a graph + vector powered memory system to dynamically retain knowledge about the codebase and its context across sessions. This feature uses Kuzu as the graph database and LanceDB as the vector database, to store all data locally in the .fraude directory.
+
+You can also manually store data using the `/remember` command. Existing Knowledge can be wiped using the `/forget` command.
+
 ---
 
 ## Supported Providers

@@ -2,7 +2,7 @@ import type { Command } from "@/types/CommandDefinition";
 import AgentCognition from "@/utils/agentCognition";
 import useFraudeStore from "@/store/useFraudeStore";
 
-const resetCommand: Command = {
+const forgetCommand: Command = {
   name: "forget",
   description: "Reset the knowledge graph (clears all memories and embeddings)",
   usage: "/forget",
@@ -24,4 +24,4 @@ const resetCommand: Command = {
   },
 };
 
-export default resetCommand;
+export default forgetCommand;

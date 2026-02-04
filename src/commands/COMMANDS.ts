@@ -13,7 +13,8 @@ import serveCommand from "./serve";
 import logCommand from "./log";
 import rememberCommand from "./remember";
 import knowledgeCommand from "./knowledge";
-import resetCommand from "./reset";
+import forgetCommand from "./forget";
+import visualizeCommand from "./visualize";
 
 const COMMANDS: Command[] = [
   usageCommand,
@@ -22,7 +23,8 @@ const COMMANDS: Command[] = [
   sessionCommands,
   rememberCommand,
   knowledgeCommand,
-  resetCommand,
+  forgetCommand,
+  visualizeCommand,
   modelCommands, //starts with model
   modelsCommands, //starts with models
   ollamaCommand,

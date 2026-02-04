@@ -4,7 +4,7 @@ import AgentCognition from "@/utils/agentCognition";
 
 const rememberCommand: Command = {
   name: "remember",
-  description: "Store a fact or decision in project knowledge",
+  description: "Store a fact or decision",
   usage: "/remember <content>",
   action: async (args: string[]) => {
     const { updateOutput } = useFraudeStore.getState();

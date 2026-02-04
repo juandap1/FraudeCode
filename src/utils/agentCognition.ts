@@ -566,7 +566,7 @@ class AgentCognition {
     const first = userMessages[0] ?? "";
     const last = userMessages[userMessages.length - 1] ?? "";
 
-    return `Session covered: "${first.slice(0, 100)}"${userMessages.length > 1 ? ` → "${last.slice(0, 100)}"` : ""}`;
+    return `"${first.slice(0, 100)}"${userMessages.length > 1 ? ` → "${last.slice(0, 100)}"` : ""}`;
   }
 
   async extractFromSession(messages: ModelMessage[]): Promise<Fact[]> {
