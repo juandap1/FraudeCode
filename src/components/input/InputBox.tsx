@@ -211,7 +211,9 @@ const InputBoxComponent = () => {
       const filtered = dynamicSuggestions.filter((s) =>
         s.startsWith(currentInput),
       );
-      if (filtered.length > 0) {
+      const isModelArg =
+        dropdownSuggestions[0]?.usage.includes("<model-name>") ?? false;
+      if (isModelArg && filtered.length > 0) {
         setGhostIndex((ghostIndex) => (ghostIndex + 1) % filtered.length);
         return;
       }
