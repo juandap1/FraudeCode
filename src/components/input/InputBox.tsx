@@ -143,6 +143,19 @@ const InputBoxComponent = () => {
 
   useInput((input, key) => {
     if (key.tab) {
+      if (isFileMode && fileDropdownSuggestions.length > 0) {
+        const selectedFile = fileDropdownSuggestions[selectedIndex];
+        if (selectedFile) {
+          const suggestion = filePrefix + selectedFile.path + " ";
+          if (suggestion !== currentInput) {
+            setCurrentInput(suggestion);
+            setInputKey((k) => k + 1);
+            setHistoryIndex(-1);
+            return;
+          }
+        }
+      }
+
       if (
         actualGhostTextSuggestion &&
         actualGhostTextSuggestion.toLowerCase() != currentInput.toLowerCase()

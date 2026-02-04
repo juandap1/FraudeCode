@@ -14,6 +14,7 @@ import { getReviewerSubAgent } from "@/agent/subagents/reviewerSubAgent";
 import type { TodoItem } from "@/agent/tools/todoTool";
 import getFastAgent from "@/agent/subagents/fastAgent";
 import getAskAgent from "@/agent/subagents/askAgent";
+import AgentCognition from "@/utils/agentCognition";
 
 const { updateOutput } = useFraudeStore.getState();
 
@@ -163,6 +164,22 @@ export default async function QueryHandler(query: string) {
   });
   resetStreamState();
 
+  // Initialize cognition and inject relevant knowledge
+  const cognition = AgentCognition.getInstance();
+  const contextManager = useFraudeStore.getState().contextManager;
+
+  try {
+    await cognition.init();
+
+    // Prime context with project knowledge (first query of session)
+    await contextManager.primeWithKnowledge();
+
+    // Inject query-specific context
+    await contextManager.injectQueryContext(query);
+  } catch (e) {
+    log(`Cognition init failed (non-fatal): ${e}`);
+  }
+
   try {
     useFraudeStore.setState({
       researchCache: {},
@@ -178,11 +195,21 @@ export default async function QueryHandler(query: string) {
       await askMode(query);
     }
 
+    // Persist session learnings after successful completion
+    try {
+      await contextManager.persistSession();
+    } catch (e) {
+      log(`Session persistence failed (non-fatal): ${e}`);
+    }
+
     if (pendingChanges.hasChanges()) {
       useFraudeStore.setState({ status: 3, statusText: "Reviewing Changes" });
-      updateOutput("confirmation", JSON.stringify({}));
+      updateOutput("confirmation", "");
     } else {
-      updateOutput("done", "Task Completed");
+      updateOutput(
+        "done",
+        `Task Completed in ${(useFraudeStore.getState().elapsedTime / 10).toFixed(1)}s`,
+      );
     }
   } catch (e: any) {
     if (e?.name === "AbortError" || e?.message === "Aborted") {

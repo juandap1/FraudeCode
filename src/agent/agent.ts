@@ -355,6 +355,7 @@ export default class Agent {
    */
   setModel(modelName: string): void {
     this.config.model = modelName;
+    this.rawModel = modelName;
     this.model = getModel(modelName);
   }
 
@@ -437,7 +438,7 @@ export default class Agent {
           throw error;
         }
 
-        log(JSON.stringify(chunk, null, 2));
+        // log(JSON.stringify(chunk, null, 2));
 
         // Detect repeated tool calls (loop detection)
         const chunkAny = chunk as Record<string, unknown>;

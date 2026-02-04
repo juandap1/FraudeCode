@@ -12,9 +12,11 @@ let _managerAgent: Agent | null = null;
  * Uses lazy initialization to ensure settings are loaded before reading primaryModel.
  */
 export function getManagerAgent(): Agent {
+  const currentModel = useSettingsStore.getState().primaryModel;
+
   if (!_managerAgent) {
     _managerAgent = new Agent({
-      model: useSettingsStore.getState().primaryModel,
+      model: currentModel,
       systemPrompt: managerPrompt,
       tools: {
         planTool,
@@ -25,6 +27,8 @@ export function getManagerAgent(): Agent {
       maxSteps: 20,
       reasoningEffort: "high",
     });
+  } else if (_managerAgent.getModel() !== currentModel) {
+    _managerAgent.setModel(currentModel);
   }
   return _managerAgent;
 }
