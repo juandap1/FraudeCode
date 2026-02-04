@@ -387,7 +387,6 @@ export default class Agent {
     for (const event of step.content as any[]) {
       if (event.type === "tool-call") {
         toolMap.set(event.toolCallId, {
-          toolCallId: event.toolCallId,
           toolName: event.toolName,
           args: event.input,
         });
@@ -395,20 +394,21 @@ export default class Agent {
         const toolCall = toolMap.get(event.toolCallId);
         if (toolCall) {
           toolCall.result = event.output;
-          actions.push("Tool Call: " + JSON.stringify(toolCall, null, 2));
-          this.getContextManager().addContext({
-            role: "assistant",
-            content: "Tool Call: " + JSON.stringify(toolCall, null, 2),
+          actions.push({
+            role: "tool",
+            content: JSON.stringify(toolCall, null, 2),
           });
         }
       } else if (event.text) {
-        actions.push(event.text);
+        actions.push({ role: "assistant", content: event.text });
         this.getContextManager().addContext({
           role: "assistant",
           content: event.text,
         });
       }
     }
+
+    this.getContextManager().addSessionActions(actions);
 
     return {
       stepNumber: (step.stepNumber as number) ?? 0,
@@ -423,6 +423,8 @@ export default class Agent {
     abortSignal?: AbortSignal,
   ): Promise<AgentResponse> {
     log("Starting stream consumption...");
+
+    this.getContextManager().clearSessionActions();
 
     try {
       for await (const chunk of result.fullStream) {

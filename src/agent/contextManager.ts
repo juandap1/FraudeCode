@@ -8,6 +8,7 @@ class ContextManager {
   private primingContext: string = "";
   private currentQueryContext: string = "";
   private cognition: AgentCognition;
+  private sessionActions: { role: string; content: string }[] = [];
 
   constructor(initialContext: ModelMessage[] = []) {
     this.history = initialContext;
@@ -35,6 +36,16 @@ class ContextManager {
     this.longTermSummary = "";
     this.primingContext = "";
     this.currentQueryContext = "";
+    this.clearSessionActions();
+  }
+
+  clearSessionActions() {
+    this.sessionActions = [];
+  }
+
+  async addSessionActions(actions: { role: string; content: string }[]) {
+    this.sessionActions.push(...actions);
+    return this.sessionActions;
   }
 
   async addContext(query: string | ModelMessage | ModelMessage[]) {
@@ -81,12 +92,16 @@ class ContextManager {
     try {
       await this.cognition.init();
       // Extract and store facts from session
-      const facts = await this.cognition.extractFromSession(this.history);
+      const facts = await this.cognition.extractFromSession(
+        this.sessionActions,
+      );
       for (const fact of facts) {
         await this.cognition.addFact(fact);
       }
       // Store session summary
-      const summary = await this.cognition.summarizeSession(this.history);
+      const summary = await this.cognition.summarizeSession(
+        this.sessionActions,
+      );
       if (summary) {
         await this.cognition.addFact({
           type: "summary",

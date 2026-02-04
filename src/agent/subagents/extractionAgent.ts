@@ -30,8 +30,9 @@ Rules:
 - "concept": domain knowledge or technical concepts explained
 - "reference": specific file/function relationships mentioned
 - Assign lower confidence (0.5-0.7) to inferred facts
-- Maximum 5 facts per extraction
 - Skip trivial or obvious information
+
+**EXTRACT FACTS THAT ARE MEANINGFUL FOR THE CODEBASE AND FOR YOU TO REMEMBER**
 
 Respond with ONLY the JSON array, no other text.`;
 

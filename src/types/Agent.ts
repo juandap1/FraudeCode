@@ -76,7 +76,7 @@ export interface AgentConfig {
 // ============================================================================
 
 export interface ToolCallInfo {
-  toolCallId: string;
+  toolCallId?: string;
   toolName: string;
   args: unknown;
   result?: unknown;
@@ -84,7 +84,7 @@ export interface ToolCallInfo {
 
 export interface StepInfo {
   stepNumber: number;
-  actions: string[];
+  actions: { role: string; content: string }[];
   toolCalls: ToolCallInfo[];
   finishReason: string;
 }
