@@ -17,10 +17,7 @@ const VISUALIZATION_HTML = `
       overflow: hidden;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #0d1117; /* Github Dark Dimmed-ish */
-      background-image: 
-        radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
-        radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
-        radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+      background-image: #111;
       color: #e0e0e0;
     }
     #mynetwork {
@@ -123,17 +120,23 @@ const VISUALIZATION_HTML = `
 <div id="mynetwork"></div>
 <div class="legend">
   <div class="legend-title">Knowledge Types</div>
-  <div class="legend-item" onclick="filterType('fact')">
-    <div class="color-dot" style="background:#00f2ea; color: #00f2ea;"></div>Fact
+  <div class="legend-item" onclick="filterType('file')">
+    <div class="color-dot" style="background:#58a6ff; color: #58a6ff;"></div>File
+  </div>
+  <div class="legend-item" onclick="filterType('module')">
+    <div class="color-dot" style="background:#7c3aed; color: #7c3aed;"></div>Module
+  </div>
+  <div class="legend-item" onclick="filterType('function')">
+    <div class="color-dot" style="background:#f97316; color: #f97316;"></div>Function
+  </div>
+  <div class="legend-item" onclick="filterType('class')">
+    <div class="color-dot" style="background:#ec4899; color: #ec4899;"></div>Class
   </div>
   <div class="legend-item" onclick="filterType('decision')">
     <div class="color-dot" style="background:#39ff14; color: #39ff14;"></div>Decision
   </div>
-  <div class="legend-item" onclick="filterType('concept')">
-    <div class="color-dot" style="background:#ff00ff; color: #ff00ff;"></div>Concept
-  </div>
-  <div class="legend-item" onclick="filterType('reference')">
-    <div class="color-dot" style="background:#ffaa00; color: #ffaa00;"></div>Reference
+  <div class="legend-item" onclick="filterType('fact')">
+    <div class="color-dot" style="background:#00f2ea; color: #00f2ea;"></div>Fact
   </div>
 </div>
 
@@ -202,21 +205,24 @@ const VISUALIZATION_HTML = `
         }
       },
       physics: {
-        forceAtlas2Based: {
-          gravitationalConstant: -26,
-          centralGravity: 0.005,
-          springLength: 230,
-          springConstant: 0.18,
-          damping: 0.4
+        barnesHut: {
+          gravitationalConstant: -8000,
+          centralGravity: 0.1,
+          springLength: 150,
+          springConstant: 0.02,
+          damping: 0.3,
+          avoidOverlap: 0.5
         },
         maxVelocity: 50,
-        minVelocity: 0.1,
-        solver: 'forceAtlas2Based',
+        minVelocity: 0.5,
+        solver: 'barnesHut',
         stabilization: {
           enabled: true,
-          iterations: 200, // Pre-stabilize
-          updateInterval: 50
-        }
+          iterations: 500,
+          updateInterval: 25,
+          fit: true
+        },
+        timestep: 0.5
       },
       interaction: {
         tooltipDelay: 100,
@@ -313,9 +319,10 @@ const command: Command = {
   action: async (args: string[]) => {
     const port = args[0] ? parseInt(args[0], 10) : 3001;
     const cognition = AgentCognition.getInstance();
+    const router = new BunApiRouter();
 
     // Register API endpoint for graph data
-    BunApiRouter.shared.register("GET", "/api/graph", async () => {
+    router.register("GET", "/api/graph", async () => {
       try {
         // Fetch all nodes
         const nodesResult = await cognition.query(`
@@ -330,28 +337,24 @@ const command: Command = {
         `);
 
         // Format for vis-network
-        const nodes = nodesResult.map((row: any) => {
-          let color = { background: "#97c2fc", border: "#2b7ce9" };
-          let shape = "dot";
+        const typeColors: Record<string, { background: string }> = {
+          // Semantic types
+          fact: { background: "#00f2ea" }, // Cyan
+          decision: { background: "#39ff14" }, // Neon Green
+          concept: { background: "#ff00ff" }, // Magenta
+          reference: { background: "#ffaa00" }, // Orange
+          // Code entity types
+          file: { background: "#58a6ff" }, // Blue
+          module: { background: "#7c3aed" }, // Violet
+          function: { background: "#f97316" }, // Orange
+          class: { background: "#ec4899" }, // Pink
+          interface: { background: "#14b8a6" }, // Teal
+          variable: { background: "#a855f7" }, // Purple
+          symbol: { background: "#94a3b8" }, // Slate
+        };
 
-          switch (row.type) {
-            case "fact":
-              color = { background: "#00f2ea", border: "#00b3ad" }; // Cyan
-              shape = "dot";
-              break;
-            case "decision":
-              color = { background: "#39ff14", border: "#2ebd11" }; // Neon Green
-              shape = "diamond";
-              break;
-            case "concept":
-              color = { background: "#ff00ff", border: "#bd00bd" }; // Magenta
-              shape = "hexagon";
-              break;
-            case "reference":
-              color = { background: "#ffaa00", border: "#c48200" }; // Orange
-              shape = "triangle";
-              break;
-          }
+        const nodes = nodesResult.map((row: any) => {
+          const color = typeColors[row.type] || { background: "#97c2fc" };
 
           return {
             id: row.id,
@@ -362,7 +365,7 @@ const command: Command = {
             title: row.content, // Tooltip
             group: row.type,
             color: color,
-            shape: shape,
+            shape: "dot",
           };
         });
 
@@ -392,7 +395,7 @@ const command: Command = {
     });
 
     // Register Visualization IO
-    BunApiRouter.shared.register("GET", "/visualize", () => {
+    router.register("GET", "/visualize", () => {
       return new Response(VISUALIZATION_HTML, {
         headers: { "Content-Type": "text/html" },
       });
@@ -408,7 +411,8 @@ const command: Command = {
     });
 
     try {
-      await BunApiRouter.shared.serve(port);
+      await router.serve(port);
+      log(`Visualization server on port ${port} stopped.`);
     } catch (error) {
       log("Server error:", error);
     }

@@ -1,41 +1,46 @@
 import type { ModelMessage, StepResult, ToolSet } from "ai";
+import { getKnowledgeOrchestrator } from "@/services/knowledgeOrchestrator";
+import type KnowledgeOrchestrator from "@/services/knowledgeOrchestrator";
 import AgentCognition from "@/utils/agentCognition";
 import log from "@/utils/logger";
 
 class ContextManager {
-  private longTermSummary: string = "";
+  // private longTermSummary: string = "";
   private history: ModelMessage[] = [];
   private primingContext: string = "";
   private currentQueryContext: string = "";
+  // private hasPrimed: boolean = false;
   private cognition: AgentCognition;
+  private orchestrator: KnowledgeOrchestrator;
   private sessionActions: { role: string; content: string }[] = [];
 
   constructor(initialContext: ModelMessage[] = []) {
     this.history = initialContext;
     this.cognition = AgentCognition.getInstance();
+    this.orchestrator = getKnowledgeOrchestrator();
   }
 
   getContext(): ModelMessage[] {
-    // Prepend priming context if available
-    if (this.primingContext) {
-      const primingMessage: ModelMessage = {
-        role: "system",
-        content: this.primingContext,
-      };
+    if (this.currentQueryContext) {
+      // const primingMessage: ModelMessage = {
+      //   role: "system",
+      //   content: this.primingContext,
+      // };
       const queryMessage: ModelMessage = {
         role: "system",
         content: this.currentQueryContext,
       };
-      return [primingMessage, queryMessage, ...this.history];
+      return [queryMessage, ...this.history]; //include primingContext if want to add previous session summaries
     }
     return this.history;
   }
 
   clearContext() {
     this.history = [];
-    this.longTermSummary = "";
+    // this.longTermSummary = "";
     this.primingContext = "";
     this.currentQueryContext = "";
+    // this.hasPrimed = false;
     this.clearSessionActions();
   }
 
@@ -59,26 +64,24 @@ class ContextManager {
     return this.history;
   }
 
-  // Prime context with project knowledge at session start
-  async primeWithKnowledge(): Promise<void> {
-    try {
-      await this.cognition.init();
-      this.primingContext = await this.cognition.getPrimingContext();
-    } catch (e) {
-      // Fail silently - priming is optional
-      this.primingContext = "";
-    }
-  }
+  // Prime context with project knowledge (once per session)
+  // async primeWithKnowledge(): Promise<void> {
+  //   if (this.hasPrimed) return;
+  //   try {
+  //     this.primingContext = await this.orchestrator.getPrimingContext();
+  //     this.hasPrimed = true;
+  //   } catch (e) {
+  //     // Fail silently - priming is optional
+  //     this.primingContext = "";
+  //   }
+  // }
 
-  // Inject query-specific context
+  // Inject query-specific context using the orchestrator's formatted output
   async injectQueryContext(query: string): Promise<void> {
     try {
-      await this.cognition.init();
-      const relevantFacts = await this.cognition.retrieveRelevant(query, 3);
-      if (relevantFacts.length > 0) {
-        const context = relevantFacts.map((f) => `- ${f.content}`).join("\n");
-        // Add as a system message before processing
-        this.currentQueryContext = `\n<relevant_knowledge>\n${context}\n</relevant_knowledge>\n`;
+      const context = await this.orchestrator.getContextForQuery(query);
+      if (context) {
+        this.currentQueryContext = context;
       }
     } catch (e) {
       // Fail silently - context injection is optional
@@ -99,16 +102,16 @@ class ContextManager {
         await this.cognition.addFact(fact);
       }
       // Store session summary
-      const summary = await this.cognition.summarizeSession(
-        this.sessionActions,
-      );
-      if (summary) {
-        await this.cognition.addFact({
-          type: "summary",
-          content: summary,
-          confidence: 0.8,
-        });
-      }
+      // const summary = await this.cognition.summarizeSession(
+      //   this.sessionActions,
+      // );
+      // if (summary) {
+      //   await this.cognition.addFact({
+      //     type: "summary",
+      //     content: summary,
+      //     confidence: 0.8,
+      //   });
+      // }
     } catch (e) {
       // Fail silently - persistence is optional
       log("Failed to persist session: " + e);
@@ -116,12 +119,10 @@ class ContextManager {
   }
 
   estimateContextTokens() {
-    return (
-      this.getContext().reduce(
-        (total, message) => total + this.estimateMessageTokens(message),
-        0,
-      ) + this.estimateMessageTokens(this.longTermSummary)
-    );
+    return this.getContext().reduce(
+      (total, message) => total + this.estimateMessageTokens(message),
+      0,
+    ); // + this.estimateMessageTokens(this.longTermSummary)
   }
 
   estimateMessageTokens(message: ModelMessage | string) {

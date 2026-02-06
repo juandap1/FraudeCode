@@ -31,12 +31,13 @@ export class BunApiRouter {
   public static getRouter(id: string): BunApiRouter | undefined {
     return this.routers.get(id);
   }
-  private id: string = crypto.randomUUID();
+  public id: string = crypto.randomUUID();
   public port: number = 3000;
   private routes: Route[] = [];
   private wsRoutes: { path: string; handler: WebSocketHandler }[] = [];
   private server: Server<any> | null = null;
   private resolveServicePromise: (() => void) | null = null;
+  public onStop?: () => void;
 
   public static stopRouter(id: string) {
     const router = this.routers.get(id);
@@ -90,15 +91,13 @@ export class BunApiRouter {
     handler: (req: Request & { params: Record<string, string> }) => any,
   ) {
     // Check for duplicates
-    const duplicate = this.routes.find(
+    const duplicateIndex = this.routes.findIndex(
       (r) => r.method === method && r.path === path,
     );
 
-    if (duplicate) {
-      updateOutput(
-        "log",
-        `[Router] Warning: Duplicate route registration attempted: ${method} ${path}. skipping.`,
-      );
+    if (duplicateIndex !== -1) {
+      // Overwrite instead of warning, to allow re-registration during development/re-runs
+      this.routes[duplicateIndex] = { method, path, handler: handler as any };
       return;
     }
 
@@ -119,6 +118,12 @@ export class BunApiRouter {
    * @param port Port to listen on (default: 3000)
    */
   public async serve(port: number = 3000): Promise<void> {
+    if (this.server) {
+      throw new Error(
+        `Router ${this.id} is already serving on port ${this.port}`,
+      );
+    }
+
     this.port = port;
 
     // Create a promise that we can manually resolve to "unblock" the caller
@@ -126,136 +131,148 @@ export class BunApiRouter {
       this.resolveServicePromise = resolve;
     });
 
-    this.server = Bun.serve<{
-      handler: WebSocketHandler;
-      params: Record<string, string>;
-    }>({
-      port,
-      idleTimeout: 180,
-      fetch: async (req, server) => {
-        const url = new URL(req.url);
+    try {
+      this.server = Bun.serve<{
+        handler: WebSocketHandler;
+        params: Record<string, string>;
+      }>({
+        port,
+        idleTimeout: 180,
+        fetch: async (req, server) => {
+          const url = new URL(req.url);
 
-        // Check for WebSocket upgrade
-        let wsParams: Record<string, string> = {};
-        const wsRoute = this.wsRoutes.find((r) => {
-          const p = this.getParams(r.path, url.pathname);
-          if (p) {
-            wsParams = p;
-            return true;
+          // Check for WebSocket upgrade
+          let wsParams: Record<string, string> = {};
+          const wsRoute = this.wsRoutes.find((r) => {
+            const p = this.getParams(r.path, url.pathname);
+            if (p) {
+              wsParams = p;
+              return true;
+            }
+            return false;
+          });
+
+          if (
+            wsRoute &&
+            server.upgrade(req, {
+              data: { handler: wsRoute.handler, params: wsParams },
+            })
+          ) {
+            return undefined;
           }
-          return false;
-        });
 
-        if (
-          wsRoute &&
-          server.upgrade(req, {
-            data: { handler: wsRoute.handler, params: wsParams },
-          })
-        ) {
-          return undefined;
-        }
+          // CORS support
+          const corsHeaders = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods":
+              "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+          };
 
-        // CORS support
-        const corsHeaders = {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods":
-            "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        };
-
-        if (req.method === "OPTIONS") {
-          return new Response(null, { headers: corsHeaders });
-        }
-
-        // Default health check
-        if (url.pathname === "/health" && req.method === "GET") {
-          return new Response("OK", { status: 200, headers: corsHeaders });
-        }
-
-        // Find matching route and extract params
-        let params: Record<string, string> = {};
-        const route = this.routes.find((r) => {
-          if (r.method !== req.method) return false;
-          const p = this.getParams(r.path, url.pathname);
-          if (p) {
-            params = p;
-            return true;
+          if (req.method === "OPTIONS") {
+            return new Response(null, { headers: corsHeaders });
           }
-          return false;
-        });
 
-        if (route) {
-          try {
-            // Attach params to request object
-            (req as any).params = params;
-            const response = await route.handler(req);
-            // Append CORS headers to the handler's response
-            const newHeaders = new Headers(response.headers);
-            Object.entries(corsHeaders).forEach(([key, value]) => {
-              newHeaders.set(key, value);
-            });
-            return new Response(response.body, {
-              status: response.status,
-              statusText: response.statusText,
-              headers: newHeaders,
-            });
-          } catch (error) {
-            console.error("Error in handler:", error);
-            return new Response("Internal Server Error", {
-              status: 500,
-              headers: corsHeaders,
-            });
+          // Default health check
+          if (url.pathname === "/health" && req.method === "GET") {
+            return new Response("OK", { status: 200, headers: corsHeaders });
           }
-        }
 
-        return new Response("Not Found", {
-          status: 404,
-          headers: corsHeaders,
-        });
-      },
-      websocket: {
-        open(ws) {
-          if (ws.data?.handler?.open) {
-            ws.data.handler.open(ws);
+          // Find matching route and extract params
+          let params: Record<string, string> = {};
+          const route = this.routes.find((r) => {
+            if (r.method !== req.method) return false;
+            const p = this.getParams(r.path, url.pathname);
+            if (p) {
+              params = p;
+              return true;
+            }
+            return false;
+          });
+
+          if (route) {
+            try {
+              // Attach params to request object
+              (req as any).params = params;
+              const response = await route.handler(req);
+              // Append CORS headers to the handler's response
+              const newHeaders = new Headers(response.headers);
+              Object.entries(corsHeaders).forEach(([key, value]) => {
+                newHeaders.set(key, value);
+              });
+              return new Response(response.body, {
+                status: response.status,
+                statusText: response.statusText,
+                headers: newHeaders,
+              });
+            } catch (error) {
+              console.error("Error in handler:", error);
+              return new Response("Internal Server Error", {
+                status: 500,
+                headers: corsHeaders,
+              });
+            }
           }
+
+          return new Response("Not Found", {
+            status: 404,
+            headers: corsHeaders,
+          });
         },
-        message(ws, message) {
-          if (ws.data?.handler?.message) {
-            ws.data.handler.message(
-              ws,
-              typeof message === "string" ? message : message.toString(),
-            );
-          }
+        websocket: {
+          open(ws) {
+            if (ws.data?.handler?.open) {
+              ws.data.handler.open(ws);
+            }
+          },
+          message(ws, message) {
+            if (ws.data?.handler?.message) {
+              ws.data.handler.message(
+                ws,
+                typeof message === "string" ? message : message.toString(),
+              );
+            }
+          },
+          close(ws) {
+            if (ws.data?.handler?.close) {
+              ws.data.handler.close(ws);
+            }
+          },
         },
-        close(ws) {
-          if (ws.data?.handler?.close) {
-            ws.data.handler.close(ws);
-          }
-        },
-      },
-    });
+      });
 
-    // Register this router instance
-    BunApiRouter.routers.set(this.id, this);
+      // Register this router instance
+      BunApiRouter.routers.set(this.id, this);
 
-    // Output the interactive component
-    updateOutput("interactive-server", this.id);
+      // Output the interactive component
+      updateOutput("interactive-server", this.id);
 
-    // Block until stopped
-    await servicePromise;
-
-    // Cleanup
-    if (this.server) {
-      this.server.stop();
+      // Block until stopped
+      await servicePromise;
+    } catch (error) {
+      updateOutput("error", `Failed to start server: ${error}`);
+      throw error;
+    } finally {
+      // Cleanup
+      if (this.server) {
+        this.server.stop(true); // Forced stop
+        this.server = null;
+      }
+      this.resolveServicePromise = null;
+      BunApiRouter.routers.delete(this.id);
     }
-
-    BunApiRouter.routers.delete(this.id);
   }
 
   public stop() {
     if (this.resolveServicePromise) {
       this.resolveServicePromise();
       this.resolveServicePromise = null;
+      if (this.onStop) this.onStop();
+    } else if (this.server) {
+      // Fallback if promise was already resolved or cleared but server is somehow active
+      this.server.stop(true);
+      this.server = null;
+      if (this.onStop) this.onStop();
     }
   }
 }

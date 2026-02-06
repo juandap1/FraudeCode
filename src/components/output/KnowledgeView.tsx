@@ -11,7 +11,6 @@ const TYPE_CONFIG: Record<
   fact: { icon: "-", label: "FCT", color: THEME.info },
   concept: { icon: "+", label: "CON", color: "#cba6f7" }, // Mauve
   reference: { icon: ">", label: "REF", color: "#fab387" }, // Peach
-  summary: { icon: "~", label: "SUM", color: THEME.primaryDim },
 };
 
 interface KnowledgeItem {
@@ -24,7 +23,7 @@ interface KnowledgeSummaryData {
   facts: KnowledgeItem[];
   concepts: KnowledgeItem[];
   references: KnowledgeItem[];
-  summaries: KnowledgeItem[];
+  // summaries: KnowledgeItem[];
 }
 
 interface KnowledgeSearchData {
@@ -177,13 +176,10 @@ export default function KnowledgeView({ data }: KnowledgeViewProps) {
   }
 
   // Summary view
-  const { decisions, facts, concepts, references, summaries } = data.data;
+  const { decisions, facts, concepts, references } = data.data;
   const total =
-    decisions.length +
-    facts.length +
-    concepts.length +
-    references.length +
-    summaries.length;
+    decisions.length + facts.length + concepts.length + references.length;
+  // + summaries.length;
 
   return (
     <Box flexDirection="column">
@@ -212,12 +208,6 @@ export default function KnowledgeView({ data }: KnowledgeViewProps) {
           type="reference"
           items={references}
           limit={3}
-        />
-        <KnowledgeSection
-          title="Session Summaries"
-          type="summary"
-          items={summaries}
-          limit={2}
         />
       </Box>
       <Box marginTop={1}>

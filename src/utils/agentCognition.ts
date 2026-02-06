@@ -2,6 +2,7 @@ import { Database, Connection, QueryResult, PreparedStatement } from "kuzu";
 import path from "path";
 import fs from "fs";
 import type { ModelMessage } from "ai";
+import ignore from "ignore";
 import EmbeddingService from "@/services/embeddingService";
 import log from "./logger";
 
@@ -11,7 +12,18 @@ import log from "./logger";
 
 export interface Fact {
   id: string;
-  type: "fact" | "decision" | "concept" | "reference" | "summary";
+  type:
+    | "fact"
+    | "decision"
+    | "concept"
+    | "reference"
+    | "file"
+    | "module"
+    | "function"
+    | "class"
+    | "interface"
+    | "variable"
+    | "symbol";
   content: string;
   data?: {
     file?: string;
@@ -132,7 +144,15 @@ class AgentCognition {
       throw new Error(`Failed to prepare statement: ${stmt.getErrorMessage()}`);
     }
     const result = await this.conn.execute(stmt, params);
+    log("DB EXECUTE RESULT:", result, "IsArray:", Array.isArray(result));
     if (Array.isArray(result)) {
+      if (result.length === 0) {
+        // Fallback for empty array result
+        return {
+          getAll: async () => [],
+          getNumTuples: () => 0,
+        } as unknown as QueryResult;
+      }
       return result[0] as QueryResult;
     }
     return result as QueryResult;
@@ -142,22 +162,49 @@ class AgentCognition {
     fact: Omit<Fact, "id" | "timestamp" | "sessionId">,
   ): Promise<string> {
     // Deduplication: Check if a fact with same type+content already exists
-    const existing = await this.findDuplicate(fact.type, fact.content);
+    const existing = await this.findDuplicate(
+      fact.type,
+      fact.content,
+      fact.data,
+    );
     if (existing) {
       // Update timestamp to keep it fresh, but don't create duplicate
       await this.execute(
         `
         MATCH (f:Fact {id: $id})
         SET f.validated = $validated,
-            f.confidence = CASE WHEN $confidence > f.confidence THEN $confidence ELSE f.confidence END
+            f.confidence = CASE WHEN $confidence > f.confidence THEN $confidence ELSE f.confidence END,
+            f.content = $content,
+            f.data = $data
         RETURN f
       `,
         {
           id: existing.id,
           validated: Date.now(),
           confidence: fact.confidence,
+          content: fact.content,
+          data: JSON.stringify(fact.data || {}),
         },
       );
+      // Ensure symbol linking even on duplicate (heals missing links)
+      if (
+        fact.data?.symbol &&
+        fact.data?.file &&
+        typeof fact.data.file === "string" &&
+        typeof fact.data.symbol === "string"
+      ) {
+        try {
+          const symbolNode = await this.findSymbolNode(
+            fact.data.file,
+            fact.data.symbol,
+          );
+          if (symbolNode && symbolNode.id !== existing.id) {
+            await this.addRelation(existing.id, symbolNode.id, "ABOUT", 1.0);
+          }
+        } catch (e) {
+          /* ignore linking errors on dup update */
+        }
+      }
       return existing.id;
     }
 
@@ -202,6 +249,25 @@ class AgentCognition {
         sessionId: this.sessionId,
         confidence: fact.confidence,
       });
+
+      // Link to canonical symbol node if this fact contains symbol data
+      if (
+        fact.data?.symbol &&
+        fact.data?.file &&
+        typeof fact.data.file === "string" &&
+        typeof fact.data.symbol === "string"
+      ) {
+        const symbolNode = await this.findSymbolNode(
+          fact.data.file,
+          fact.data.symbol,
+        );
+        if (symbolNode && symbolNode.id !== id) {
+          await this.addRelation(id, symbolNode.id, "ABOUT", 1.0);
+        }
+      }
+
+      // Discover relations to existing facts
+      await this.discoverRelations(id, fact.content);
     } catch (e) {
       // Embedding storage is optional, don't fail if it errors
     }
@@ -212,8 +278,40 @@ class AgentCognition {
   private async findDuplicate(
     type: Fact["type"],
     content: string,
+    data?: Fact["data"],
   ): Promise<Fact | null> {
-    // 1. Exact string match (Fast path)
+    // 1. Structural Identity (Stable IDs for code symbols)
+    if (data?.file && data?.symbol) {
+      const relFile = path.isAbsolute(data.file)
+        ? path.relative(process.cwd(), data.file)
+        : data.file;
+
+      try {
+        const fileFrag = `"file":"${relFile}"`;
+        const symbolFrag = `"symbol":"${data.symbol}"`;
+        const result = await this.execute(
+          `
+          MATCH (f:Fact {type: $type})
+          WHERE f.data CONTAINS $fileFrag AND f.data CONTAINS $symbolFrag
+          RETURN f
+          LIMIT 10
+        `,
+          { type, fileFrag, symbolFrag },
+        );
+        const rows = await result.getAll();
+        for (const row of rows) {
+          const parsed = this.parseFact(row.f as Record<string, unknown>);
+          if (
+            parsed.data?.file === relFile &&
+            parsed.data?.symbol === data.symbol
+          ) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 2. Exact string match (Fast path)
     try {
       const result = await this.execute(
         `
@@ -232,11 +330,13 @@ class AgentCognition {
       }
     } catch (e) {}
 
-    // 2. Semantic similarity check (Vector DB)
+    // 3. Semantic similarity check (Vector DB)
     // Use a high threshold (0.92) to establish "essentially the same meaning"
     try {
       const semanticResults = await this.embeddings.search(content, 3, 0.92);
-      const match = semanticResults.find((r) => r.type === type);
+      const match = semanticResults.find((r) => {
+        return r.type === type;
+      });
 
       if (match) {
         // Fetch full fact from Graph DB to get all fields (e.g. validated status)
@@ -277,6 +377,310 @@ class AgentCognition {
     );
   }
 
+  /**
+   * Discover and create relations between a new fact and existing facts.
+   * Uses vector similarity for discovery and LLM for relation typing.
+   */
+  private async discoverRelations(
+    newFactId: string,
+    content: string,
+  ): Promise<void> {
+    // Skip for very short content
+    if (content.length < 30) return;
+
+    try {
+      // Find semantically similar existing facts
+      const similar = await this.embeddings.search(content, 5, 0.6);
+
+      for (const match of similar) {
+        // Skip self-references
+        if (match.id === newFactId) continue;
+
+        // High similarity: use LLM to classify relation type
+        if (match.score >= 0.85) {
+          try {
+            const { classifyRelation } =
+              await import("@/agent/subagents/relationAgent");
+            const relationType = await classifyRelation(content, match.content);
+            await this.addRelation(
+              newFactId,
+              match.id,
+              relationType,
+              match.score,
+            );
+          } catch (e) {
+            // Fallback if import fails
+            await this.addRelation(
+              newFactId,
+              match.id,
+              "RELATED_TO",
+              match.score,
+            );
+          }
+        } else if (match.score >= 0.6) {
+          // Medium similarity: use generic RELATED_TO
+          await this.addRelation(
+            newFactId,
+            match.id,
+            "RELATED_TO",
+            match.score,
+          );
+        }
+      }
+    } catch (e) {
+      // Relation discovery is non-critical, log and continue
+      log("Relation discovery failed: " + e);
+    }
+  }
+
+  /**
+   * Batch insert facts and relations for atomic knowledge updates.
+   * Efficiently handles indexing large amounts of symbol data.
+   */
+  async addFactsWithRelations(
+    facts: Omit<Fact, "id" | "timestamp" | "sessionId">[],
+    relations: { sourceIdx: number; targetIdx: number; type: string }[],
+  ): Promise<string[]> {
+    // 1. Insert all facts first, collecting IDs
+    const factIds: string[] = [];
+    for (const fact of facts) {
+      // Use standard addFact to ensure deduplication and vector embedding
+      // Note: This calls discoverRelations() for each fact, which is good for cross-linking
+      const id = await this.addFact(fact);
+      factIds.push(id);
+    }
+
+    // 2. Create provided relations using collected IDs
+    for (const rel of relations) {
+      const sourceId = factIds[rel.sourceIdx];
+      const targetId = factIds[rel.targetIdx];
+
+      // Safety check: ensure both ends exist
+      if (sourceId && targetId) {
+        await this.addRelation(sourceId, targetId, rel.type);
+      }
+    }
+
+    return factIds;
+  }
+
+  /**
+   * Index a source file to extract symbols and structural relations.
+   * Maps code intelligence (DEFINES, CALLS) into the knowledge graph.
+   */
+  async indexFile(filePath: string): Promise<void> {
+    try {
+      const stats = fs.statSync(filePath);
+      const mtime = stats.mtimeMs;
+      const relPath = path.relative(process.cwd(), filePath);
+
+      // Check if file has changed since last indexing
+      const existingFileFact = await this.findDuplicate(
+        "file",
+        `File: ${relPath}`,
+        { file: relPath },
+      );
+      if (existingFileFact && existingFileFact.data?.mtime === mtime) {
+        log(`[AgentCognition] Skipping unchanged file: ${relPath}`);
+        return;
+      }
+
+      const { SymbolExtractor } = await import("@/services/symbolExtractor");
+      const extractor = new SymbolExtractor();
+      const { facts, relations } = await extractor.analyze(filePath);
+
+      if (facts.length > 0) {
+        // Update file fact with mtime
+        const fileFactIdx = facts.findIndex((f) => f.type === "file");
+        if (fileFactIdx !== -1) {
+          const fileFact = facts[fileFactIdx];
+          if (fileFact) {
+            fileFact.data = { ...(fileFact.data || {}), mtime };
+          }
+        }
+
+        log(
+          `Indexing ${filePath}: ${facts.length} symbols, ${relations.length} relations`,
+        );
+        const indexedIds = await this.addFactsWithRelations(facts, relations);
+
+        // Purge symbols that are no longer in the file
+        const currentSymbolNames = facts
+          .filter((f) => f.type !== "file" && f.type !== "module")
+          .map((f) => (f.data as any).symbol)
+          .filter(Boolean);
+
+        await this.purgeOrphanedSymbols(filePath, currentSymbolNames);
+      }
+    } catch (e) {
+      log(`Failed to index file ${filePath}: ${e}`);
+    }
+  }
+
+  /**
+   * Remove symbol-related facts for a file that are no longer present.
+   * Uses DETACH DELETE to ensure no orphaned relations remain.
+   */
+  private async purgeOrphanedSymbols(
+    filePath: string,
+    currentSymbols: string[],
+  ): Promise<void> {
+    const codeTypes =
+      "['function', 'class', 'interface', 'variable', 'symbol']";
+    const relFile = path.relative(process.cwd(), filePath);
+    try {
+      const result = await this.execute(
+        `
+        MATCH (f:Fact)
+        WHERE f.type IN ${codeTypes} AND f.data CONTAINS $file
+        RETURN f
+      `,
+        { file: `"${relFile}"` },
+      );
+      const rows = await result.getAll();
+
+      for (const row of rows) {
+        const fact = this.parseFact(row.f as Record<string, unknown>);
+        if (
+          fact.data?.file === relFile &&
+          fact.data?.symbol &&
+          !currentSymbols.includes(fact.data.symbol as string)
+        ) {
+          log(
+            `[AgentCognition] Purging orphaned symbol: ${fact.data.symbol} from ${relFile}`,
+          );
+          await this.execute(`MATCH (f:Fact {id: $id}) DETACH DELETE f`, {
+            id: fact.id,
+          });
+        }
+      }
+    } catch (e) {
+      log(`Failed to purge orphaned symbols for ${relFile}: ${e}`);
+    }
+  }
+
+  /**
+   * Remove all symbol-related facts for a file (called before re-indexing).
+   * Also cleans up relations to prevent orphaned edges.
+   */
+  /**
+   * Remove all symbol-related facts for a file (called when cleanup is forced).
+   * Also cleans up relations to prevent orphaned edges.
+   */
+  private async clearFileSymbols(filePath: string): Promise<void> {
+    const codeTypes =
+      "['file', 'module', 'function', 'class', 'interface', 'variable', 'symbol']";
+    const relFile = path.relative(process.cwd(), filePath);
+    try {
+      // Use DETACH DELETE for cleaner relation removal
+      await this.execute(
+        `
+        MATCH (f:Fact)
+        WHERE f.type IN ${codeTypes} AND f.data CONTAINS $file
+        DETACH DELETE f
+      `,
+        { file: `"${relFile}"` },
+      );
+    } catch (e) {
+      // Non-critical
+    }
+  }
+
+  /**
+   * Index all supported files in a directory (background batch indexing).
+   * Runs non-blocking and logs progress.
+   */
+  async indexDirectory(
+    dirPath: string,
+    extensions = [".ts", ".tsx", ".js", ".jsx", ".py"],
+  ): Promise<void> {
+    // Load .gitignore patterns
+    const ig = ignore();
+    const gitignorePath = path.join(dirPath, ".gitignore");
+    if (fs.existsSync(gitignorePath)) {
+      const gitignoreContent = fs.readFileSync(gitignorePath, "utf-8");
+      ig.add(gitignoreContent);
+    }
+    // Always ignore .fraude data folder and common build artifacts
+    ig.add([".fraude", "node_modules", "dist", "build", ".git"]);
+
+    const glob = new Bun.Glob(`**/*{${extensions.join(",")}}`);
+    const files: string[] = [];
+
+    for await (const file of glob.scan({
+      cwd: dirPath,
+      absolute: true,
+      onlyFiles: true,
+      dot: false,
+    })) {
+      // Get relative path for gitignore matching
+      const relativePath = path.relative(dirPath, file);
+      if (ig.ignores(relativePath)) {
+        continue;
+      }
+      files.push(file);
+    }
+
+    log(`Background indexing: ${files.length} files in ${dirPath}`);
+
+    // Process files with a small delay between each to avoid blocking
+    for (const file of files) {
+      try {
+        await this.indexFile(file);
+      } catch (e) {
+        // Continue on individual file failures
+      }
+      // Yield to event loop occasionally
+      await new Promise((r) => setTimeout(r, 10));
+    }
+
+    log(`Background indexing complete: ${files.length} files processed`);
+  }
+
+  /**
+   * Find a canonical symbol node in the graph.
+   * Used to link extracted semantic facts to concrete code symbols.
+   */
+  async findSymbolNode(file: string, symbol: string): Promise<Fact | null> {
+    const relFile = path.relative(process.cwd(), file);
+    try {
+      // Broaden search to find candidate symbols, then filter strictly in memory
+      // This avoids issues with path formatting/escaping in Cypher
+      const result = await this.execute(
+        `
+        MATCH (f:Fact)
+        WHERE f.data CONTAINS $symbol 
+        RETURN f
+        LIMIT 20
+      `,
+        { symbol },
+      );
+
+      const rows = await result.getAll();
+
+      if (rows.length > 0) {
+        // Filter in memory to ensure precise match if multiple fuzzy ones returned
+        const match = rows.find((row) => {
+          try {
+            const data = JSON.parse((row.f as any).data);
+            // Strict equality check on parsed JSON
+            // ALSO ensure it is a structural symbol (has kind) to avoid matching the semantic fact itself
+            return data.symbol === symbol && data.file === relFile && data.kind;
+          } catch {
+            return false;
+          }
+        });
+
+        if (match) {
+          return this.parseFact(match.f as Record<string, unknown>);
+        }
+      }
+    } catch (e) {
+      log(`findSymbolNode error: ${e}`);
+    }
+    return null;
+  }
+
   async query(
     cypher: string,
     params: Record<string, unknown> = {},
@@ -302,7 +706,8 @@ class AgentCognition {
   async findRelated(factId: string, depth: number = 1): Promise<Fact[]> {
     const result = await this.execute(
       `
-      MATCH (start:Fact {id: $factId})-[:RELATED_TO*1..${depth}]->(related:Fact)
+      MATCH (start:Fact {id: $factId})-[r*1..${depth}]->(related:Fact)
+      WHERE NOT start.id = related.id
       RETURN DISTINCT related
     `,
       { factId },
@@ -330,30 +735,30 @@ class AgentCognition {
     );
   }
 
-  async getPrimingContext(): Promise<string> {
-    // Get key project knowledge: recent summaries and high-confidence decisions
-    const summaries = await this.findByType("summary");
-    const decisions = await this.findByType("decision");
+  // async getPrimingContext(): Promise<string> {
+  //   // Get key project knowledge: recent summaries and high-confidence decisions
+  //   const summaries = await this.findByType("summary");
+  //   const decisions = await this.findByType("decision");
 
-    const validSummaries = await this.filterValid(summaries.slice(0, 3));
-    const validDecisions = await this.filterValid(decisions.slice(0, 5));
+  //   const validSummaries = await this.filterValid(summaries.slice(0, 3));
+  //   const validDecisions = await this.filterValid(decisions.slice(0, 5));
 
-    const parts: string[] = [];
+  //   const parts: string[] = [];
 
-    if (validSummaries.length > 0) {
-      parts.push("<previous_session_context>");
-      validSummaries.forEach((s) => parts.push(`- ${s.content}`));
-      parts.push("</previous_session_context>");
-    }
+  //   if (validSummaries.length > 0) {
+  //     parts.push("<previous_session_context>");
+  //     validSummaries.forEach((s) => parts.push(`- ${s.content}`));
+  //     parts.push("</previous_session_context>");
+  //   }
 
-    if (validDecisions.length > 0) {
-      parts.push("<project_decisions>");
-      validDecisions.forEach((d) => parts.push(`- ${d.content}`));
-      parts.push("</project_decisions>");
-    }
+  //   if (validDecisions.length > 0) {
+  //     parts.push("<project_decisions>");
+  //     validDecisions.forEach((d) => parts.push(`- ${d.content}`));
+  //     parts.push("</project_decisions>");
+  //   }
 
-    return parts.join("\n");
-  }
+  //   return parts.join("\n");
+  // }
 
   async retrieveRelevant(query: string, limit: number = 5): Promise<Fact[]> {
     // Hybrid search: combine vector similarity + graph relationships
@@ -444,11 +849,16 @@ class AgentCognition {
   async validateFact(fact: Fact): Promise<ValidationResult> {
     // 1. File reference check
     if (fact.data?.file) {
+      // Normalize to absolute for existence check
       const filePath = path.isAbsolute(fact.data.file)
         ? fact.data.file
-        : path.join(process.cwd(), fact.data.file);
+        : path.resolve(process.cwd(), fact.data.file);
 
-      if (!fs.existsSync(filePath)) {
+      if (fact.type === "file" && !fs.existsSync(filePath)) {
+        // Strict check for FactType.FILE
+        return { valid: false, reason: "file_missing", suggestion: "delete" };
+      } else if (!fs.existsSync(filePath) && !fact.data.isExternal) {
+        // Loose check for other types (might be external libs)
         return { valid: false, reason: "file_missing", suggestion: "delete" };
       }
     }
@@ -468,7 +878,7 @@ class AgentCognition {
       if (fact.data?.file) {
         const filePath = path.isAbsolute(fact.data.file)
           ? fact.data.file
-          : path.join(process.cwd(), fact.data.file);
+          : path.resolve(process.cwd(), fact.data.file);
 
         if (fs.existsSync(filePath)) {
           const stat = fs.statSync(filePath);
@@ -491,7 +901,7 @@ class AgentCognition {
 
     const filePath = path.isAbsolute(data.file)
       ? data.file
-      : path.join(process.cwd(), data.file);
+      : path.resolve(process.cwd(), data.file);
 
     if (!fs.existsSync(filePath)) return false;
 
@@ -552,12 +962,14 @@ class AgentCognition {
   // Session Management
   // ============================================================================
 
-  async summarizeSession(messages: ModelMessage[]): Promise<string> {
+  async summarizeSession(
+    messages: { role: string; content: string }[],
+  ): Promise<string> {
     // Simple extraction: look for key patterns in messages
     // Could be enhanced with LLM-based summarization
     const userMessages = messages
-      .filter((m) => m.role === "user")
-      .map((m) => (typeof m.content === "string" ? m.content : ""))
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => m.content)
       .filter((c) => c.length > 0);
 
     if (userMessages.length === 0) return "";
@@ -569,17 +981,19 @@ class AgentCognition {
     return `"${first.slice(0, 100)}"${userMessages.length > 1 ? ` → "${last.slice(0, 100)}"` : ""}`;
   }
 
-  async extractFromSession(messages: ModelMessage[]): Promise<Fact[]> {
+  async extractFromSession(
+    messages: { role: string; content: string }[],
+  ): Promise<Fact[]> {
     log("Extracting facts from session");
     // Extract facts from session using LLM-based analysis
     const recentMessages = messages.slice(-15);
     const conversationText = recentMessages
-      .map((m) => this.formatMessageForExtraction(m))
-      .join("\n\n---\n\n");
+      .map((m) => `${m.role.toUpperCase()}:\n${m.content}`)
+      .join("\n---\n");
 
     const assistantMessages = messages
-      .filter((m) => m.role === "assistant")
-      .map((m) => (typeof m.content === "string" ? m.content : ""));
+      .filter((m) => m.role === "assistant" || m.role === "user")
+      .map((m) => m.content);
 
     if (conversationText.length < 50 && assistantMessages.length === 0)
       return [];
@@ -594,40 +1008,6 @@ class AgentCognition {
 
     // Fallback: regex-based extraction
     return this.extractWithPatterns(assistantMessages);
-  }
-
-  private formatMessageForExtraction(m: ModelMessage): string {
-    const role = m.role.toUpperCase();
-    // log(JSON.stringify(m, null, 2));
-    let content = "";
-
-    // Handle Assistant messages (Text + Reasoning + Tool Calls)
-    if (m.role === "assistant") {
-      const textContent =
-        typeof m.content === "string"
-          ? m.content
-          : Array.isArray(m.content)
-            ? m.content
-                .map((c: any) => c.text)
-                .filter((c) => c !== null)
-                .join("\n")
-            : "";
-      content = textContent;
-    }
-    // Handle User messages
-    else {
-      if (typeof m.content === "string") {
-        content = m.content;
-      } else if (Array.isArray(m.content)) {
-        content = m.content
-          .map((c: any) => (c.type === "text" ? c.text : `[${c.type} content]`))
-          .join("\n");
-      } else {
-        content = "[Complex Content]";
-      }
-    }
-
-    return `${role}:\n${content}`;
   }
 
   private async extractWithLLM(content: string): Promise<Fact[]> {
@@ -664,6 +1044,7 @@ class AgentCognition {
               timestamp: Date.now(),
               sessionId: this.sessionId,
               confidence: 0.7,
+              validated: Date.now(),
             });
           }
         }
@@ -687,6 +1068,7 @@ class AgentCognition {
               timestamp: Date.now(),
               sessionId: this.sessionId,
               confidence: 0.6,
+              validated: Date.now(),
             });
           }
         }
@@ -707,10 +1089,9 @@ class AgentCognition {
   async reset(): Promise<void> {
     await this.init();
 
-    // Clear Graph DB
+    // Clear Graph DB - drop relation tables first (they depend on Fact)
     if (this.conn) {
       try {
-        // Drop tables if they exist
         await this.conn.query("DROP TABLE RELATED_TO");
       } catch (e) {}
 

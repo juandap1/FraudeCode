@@ -14,7 +14,6 @@ import { getReviewerSubAgent } from "@/agent/subagents/reviewerSubAgent";
 import type { TodoItem } from "@/agent/tools/todoTool";
 import getFastAgent from "@/agent/subagents/fastAgent";
 import getAskAgent from "@/agent/subagents/askAgent";
-import AgentCognition from "@/utils/agentCognition";
 
 const { updateOutput } = useFraudeStore.getState();
 
@@ -165,19 +164,16 @@ export default async function QueryHandler(query: string) {
   resetStreamState();
 
   // Initialize cognition and inject relevant knowledge
-  const cognition = AgentCognition.getInstance();
   const contextManager = useFraudeStore.getState().contextManager;
 
   try {
-    await cognition.init();
+    // Prime context with project knowledge (once per session)
+    // await contextManager.primeWithKnowledge();
 
-    // Prime context with project knowledge (first query of session)
-    await contextManager.primeWithKnowledge();
-
-    // Inject query-specific context
+    // Inject query-specific context via orchestrator
     await contextManager.injectQueryContext(query);
   } catch (e) {
-    log(`Cognition init failed (non-fatal): ${e}`);
+    log(`Knowledge injection failed (non-fatal): ${e}`);
   }
 
   try {

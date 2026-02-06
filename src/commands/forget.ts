@@ -1,5 +1,6 @@
 import type { Command } from "@/types/CommandDefinition";
 import AgentCognition from "@/utils/agentCognition";
+import { resetLSPClient } from "@/utils/lspClient";
 import useFraudeStore from "@/store/useFraudeStore";
 
 const forgetCommand: Command = {
@@ -9,10 +10,11 @@ const forgetCommand: Command = {
   action: async () => {
     const { updateOutput } = useFraudeStore.getState();
     try {
-      updateOutput("log", "Resetting knowledge graph...");
+      updateOutput("log", "Resetting knowledge graph and LSP cache...");
 
       const cognition = AgentCognition.getInstance();
       await cognition.reset();
+      resetLSPClient();
 
       updateOutput(
         "done",

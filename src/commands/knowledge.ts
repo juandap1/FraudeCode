@@ -12,21 +12,17 @@ const action = async (args: string[]) => {
 
     if (args.length === 0) {
       // Show summary of all knowledge
-      const [decisions, facts, concepts, references, summaries] =
-        await Promise.all([
-          cognition.findByType("decision"),
-          cognition.findByType("fact"),
-          cognition.findByType("concept"),
-          cognition.findByType("reference"),
-          cognition.findByType("summary"),
-        ]);
+      const [decisions, facts, concepts, references] = await Promise.all([
+        cognition.findByType("decision"),
+        cognition.findByType("fact"),
+        cognition.findByType("concept"),
+        cognition.findByType("reference"),
+        // cognition.findByType("summary"),
+      ]);
 
       const total =
-        decisions.length +
-        facts.length +
-        concepts.length +
-        references.length +
-        summaries.length;
+        decisions.length + facts.length + concepts.length + references.length;
+      // + summaries.length;
 
       if (total === 0) {
         const data: KnowledgeViewData = { mode: "empty" };
@@ -50,10 +46,10 @@ const action = async (args: string[]) => {
             content: r.content,
             type: r.type,
           })),
-          summaries: summaries.map((s) => ({
-            content: s.content,
-            type: s.type,
-          })),
+          // summaries: summaries.map((s) => ({
+          //   content: s.content,
+          //   type: s.type,
+          // })),
         },
       };
 
