@@ -1,5 +1,6 @@
 import { Box, Text } from "ink";
 import Gradient from "ink-gradient";
+import { version } from "../../package.json";
 
 const INTRO_THEME = {
   primary: "#FFB6C1",
@@ -45,6 +46,7 @@ export default function IntroComponent() {
         <Text color={INTRO_THEME.primaryDim}>
           FRAUDE CODE <Text color={INTRO_THEME.dim}>·</Text>{" "}
           <Text italic>Agentic AI Assistant</Text>
+          <Text color={INTRO_THEME.dim}> v{version}</Text>
         </Text>
       </Box>
 

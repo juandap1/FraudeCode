@@ -1,11 +1,35 @@
 {
-  "name": "fraudecode",
+  "name": "fraude-code",
+  "version": "0.1.1",
+  "description": "FraudeCode - An AI coding agent powered by Graph + Vector memory",
+  "author": "Matthew Branning",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mbranni03/FraudeCode.git"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "cli",
+    "coding",
+    "bun",
+    "graph",
+    "vector",
+    "memory"
+  ],
   "module": "index.ts",
   "type": "module",
-  "private": true,
+  "private": false,
   "bin": {
-    "fraude": "./src/index.tsx"
+    "fraude": "./dist/index.js"
   },
+  "files": [
+    "dist",
+    "src",
+    "tsconfig.json",
+    "README.md"
+  ],
   "devDependencies": {
     "@types/bun": "latest",
     "@types/diff": "^8.0.0",
@@ -26,19 +50,23 @@
     "@openrouter/ai-sdk-provider": "^1.5.4",
     "@qdrant/js-client-rest": "^1.16.2",
     "@tavily/ai-sdk": "^0.4.1",
+    "@types/react-dom": "^19.2.3",
     "@vscode/ripgrep": "^1.17.0",
     "@xenova/transformers": "^2.17.2",
     "ai": "^6.0.33",
     "diff": "^8.0.2",
     "fast-xml-parser": "^5.3.4",
     "ignore": "^7.0.5",
+    "ink": "^6.6.0",
     "ink-big-text": "^2.0.0",
     "ink-gradient": "^3.0.0",
     "kuzu": "^0.11.3",
     "neo4j-driver": "^6.0.1",
     "ollama-ai-provider-v2": "^3.0.1",
     "pyodide": "^0.29.3",
+    "react": "^19.2.4",
     "react-devtools-core": "^7.0.1",
+    "react-dom": "^19.2.4",
     "vscode-jsonrpc": "^8.2.1",
     "vscode-languageserver-protocol": "^3.17.5",
     "vscode-languageserver-types": "^3.17.5",
@@ -48,9 +76,10 @@
   },
   "scripts": {
     "dev": "bun run src/index.tsx",
-    "build": "bun build src/index.tsx --target bun --compile --minify --sourcemap --outfile fraude",
-    "start": "./fraude",
+    "build": "bun run scripts/build.ts",
+    "start": "bun ./dist/index.js",
     "type-check": "tsc --noEmit",
+    "prepublishOnly": "bun run build",
     "get-log": "bun scripts/get-log.ts"
   },
   "trustedDependencies": [

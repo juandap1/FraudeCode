@@ -1215,13 +1215,21 @@ export class UniversalLSPClient {
 
     // Use import.meta.dir for Bun to get module-relative path
     // Fall back to rootPath for Node.js compatibility
-    const moduleDir =
-      typeof import.meta?.dir === "string"
-        ? path.resolve(import.meta.dir, "../..")
-        : rootPath;
+    // Find the project root robustly for both development and bundled production
+    const currentDir = import.meta.dir;
+    let moduleDir = currentDir;
+
+    // If in dist/ or src/utils/, go up until we find the root
+    if (currentDir.endsWith("dist") || currentDir.endsWith("utils")) {
+      moduleDir = path.resolve(currentDir, "..");
+      if (currentDir.endsWith("utils")) {
+        moduleDir = path.resolve(moduleDir, "..");
+      }
+    }
+
     const pythonWasm = path.resolve(
       moduleDir,
-      "parsers/tree-sitter-python.wasm",
+      "src/parsers/tree-sitter-python.wasm",
     );
     this.pyProvider = new TreeSitterProvider("python", pythonWasm);
   }

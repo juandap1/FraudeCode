@@ -5,6 +5,16 @@
 </p>
 <p align="center">Just another AI coding agent.</p>
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/fraude-code"><img alt="npm" src="https://img.shields.io/npm/v/fraude-code?style=flat-square" /></a>
+</p>
+
+## Installation
+
+```bash
+npm install -g fraude-code
+```
+
 ---
 
 ## What is FraudeCode?

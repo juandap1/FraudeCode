@@ -7,6 +7,7 @@ import { ModelSchema, parseModelUniqueId } from "../types/Model";
 import type { TokenUsage } from "@/types/TokenUsage";
 import useSettingsStore from "@/store/useSettingsStore";
 import { SettingsSchema, type Config } from "./schema";
+import useFraudeStore from "@/store/useFraudeStore";
 
 class Settings {
   private static instance: Settings | null = null;
@@ -103,9 +104,16 @@ class Settings {
             `${settingsPath}.bak`,
             JSON.stringify(rawData, null, 2),
           );
-          console.log(`Backed up invalid settings to ${settingsPath}.bak`);
+          useFraudeStore
+            .getState()
+            .updateOutput(
+              "log",
+              `Backed up invalid settings to ${settingsPath}.bak`,
+            );
         } catch (backupError) {
-          console.error("Failed to backup settings:", backupError);
+          useFraudeStore
+            .getState()
+            .updateOutput("error", "Failed to backup settings:" + backupError);
         }
 
         // Return a merge of defaults and raw data to preserve what we can
@@ -122,7 +130,9 @@ class Settings {
 
       return result.data;
     } catch (e) {
-      console.error("Error loading settings:", e);
+      useFraudeStore
+        .getState()
+        .updateOutput("error", "Error loading settings:" + e);
       return SettingsSchema.parse({});
     }
   }
