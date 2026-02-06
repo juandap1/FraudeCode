@@ -15,9 +15,11 @@ let _reviewerSubAgent: Agent | null = null;
  * Uses lazy initialization to ensure settings are loaded before reading secondaryModel.
  */
 export function getReviewerSubAgent(): Agent {
+  const currentModel = useSettingsStore.getState().secondaryModel;
+
   if (!_reviewerSubAgent) {
     _reviewerSubAgent = new Agent({
-      model: useSettingsStore.getState().secondaryModel,
+      model: currentModel,
       systemPrompt: ReviewerPrompt,
       tools: {
         readTool,
@@ -31,6 +33,8 @@ export function getReviewerSubAgent(): Agent {
       maxSteps: 10,
       useIsolatedContext: true,
     });
+  } else if (_reviewerSubAgent.getModel() !== currentModel) {
+    _reviewerSubAgent.setModel(currentModel);
   }
   return _reviewerSubAgent;
 }

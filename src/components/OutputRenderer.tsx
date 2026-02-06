@@ -12,6 +12,7 @@ import ToolCallView from "./output/ToolCallView";
 import DiffView from "./output/DiffView";
 import ConfirmationView from "./output/ConfirmationView";
 import ModelSelectView from "./output/ModelSelectView";
+import KnowledgeView, { type KnowledgeViewData } from "./output/KnowledgeView";
 import { THEME } from "../theme";
 
 import InteractiveServerView from "./output/InteractiveServerView";
@@ -60,6 +61,14 @@ function renderItem(item: OutputItem) {
       return <ModelSelectView />;
     case "interactive-server":
       return <InteractiveServerView routerId={item.content} />;
+    case "knowledge": {
+      try {
+        const data = JSON.parse(item.content) as KnowledgeViewData;
+        return <KnowledgeView data={data} />;
+      } catch {
+        return <Text dimColor>{item.content}</Text>;
+      }
+    }
     default:
       return null;
   }

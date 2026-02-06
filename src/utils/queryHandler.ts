@@ -163,6 +163,19 @@ export default async function QueryHandler(query: string) {
   });
   resetStreamState();
 
+  // Initialize cognition and inject relevant knowledge
+  const contextManager = useFraudeStore.getState().contextManager;
+
+  try {
+    // Prime context with project knowledge (once per session)
+    // await contextManager.primeWithKnowledge();
+
+    // Inject query-specific context via orchestrator
+    await contextManager.injectQueryContext(query);
+  } catch (e) {
+    log(`Knowledge injection failed (non-fatal): ${e}`);
+  }
+
   try {
     useFraudeStore.setState({
       researchCache: {},
@@ -178,11 +191,21 @@ export default async function QueryHandler(query: string) {
       await askMode(query);
     }
 
+    // Persist session learnings after successful completion
+    try {
+      await contextManager.persistSession();
+    } catch (e) {
+      log(`Session persistence failed (non-fatal): ${e}`);
+    }
+
     if (pendingChanges.hasChanges()) {
       useFraudeStore.setState({ status: 3, statusText: "Reviewing Changes" });
-      updateOutput("confirmation", JSON.stringify({}));
+      updateOutput("confirmation", "");
     } else {
-      updateOutput("done", "Task Completed");
+      updateOutput(
+        "done",
+        `Task Completed in ${(useFraudeStore.getState().elapsedTime / 10).toFixed(1)}s`,
+      );
     }
   } catch (e: any) {
     if (e?.name === "AbortError" || e?.message === "Aborted") {

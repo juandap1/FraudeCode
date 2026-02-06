@@ -11,12 +11,20 @@ import sessionCommands from "./session";
 import usageCommand from "./usage";
 import serveCommand from "./serve";
 import logCommand from "./log";
+import rememberCommand from "./remember";
+import knowledgeCommand from "./knowledge";
+import forgetCommand from "./forget";
+import visualizeCommand from "./visualize";
 
 const COMMANDS: Command[] = [
   usageCommand,
   logCommand,
   serveCommand,
   sessionCommands,
+  rememberCommand,
+  knowledgeCommand,
+  forgetCommand,
+  visualizeCommand,
   modelCommands, //starts with model
   modelsCommands, //starts with models
   ollamaCommand,

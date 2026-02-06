@@ -25,6 +25,7 @@ const InputBoxComponent = () => {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [allFiles, setAllFiles] = useState<FileSuggestion[]>([]);
   const [scrollOffset, setScrollOffset] = useState(0);
+  const [ghostIndex, setGhostIndex] = useState(0);
 
   useEffect(() => {
     getFileSuggestions(process.cwd()).then(setAllFiles);
@@ -132,17 +133,49 @@ const InputBoxComponent = () => {
     filePrefix,
   ]);
 
+  const hiddenSuggestions = useMemo(() => {
+    if (currentInput.startsWith("/")) {
+      return new Set(
+        dynamicSuggestions
+          .filter((s) => s.startsWith(currentInput))
+          .slice(0, ghostIndex),
+      );
+    }
+    return new Set();
+  }, [dynamicSuggestions, currentInput, ghostIndex]);
+
   // Calculate what ghost text the TextInput is ACTUALLY showing
   // This mirrors TextInput's internal logic: first suggestion that starts with input
   const actualGhostTextSuggestion = useMemo(() => {
     if (currentInput.length === 0) return null;
     const match = dynamicSuggestions.find((s) => s.startsWith(currentInput));
     if (!match) return null;
+    const currentArg = currentInput.split(" ").length;
+    const dropdownSuggestion = dropdownSuggestions[selectedIndex];
+    if (
+      dropdownSuggestion?.usage &&
+      dropdownSuggestion.usage.split(" ")[currentArg] !== "<model-name>"
+    ) {
+      return dropdownSuggestion.usage.replace(/<[^>]+>.*$/, "");
+    }
     return match.replace(/<[^>]+>.*$/, "");
-  }, [currentInput, dynamicSuggestions]);
+  }, [currentInput, dynamicSuggestions, selectedIndex, dropdownSuggestions]);
 
   useInput((input, key) => {
     if (key.tab) {
+      if (isFileMode && fileDropdownSuggestions.length > 0) {
+        const selectedFile = fileDropdownSuggestions[selectedIndex];
+        if (selectedFile) {
+          const suggestion = filePrefix + selectedFile.path + " ";
+          if (suggestion !== currentInput) {
+            setCurrentInput(suggestion);
+            setInputKey((k) => k + 1);
+            setHistoryIndex(-1);
+            return;
+          }
+        }
+      }
+
       if (
         actualGhostTextSuggestion &&
         actualGhostTextSuggestion.toLowerCase() != currentInput.toLowerCase()
@@ -163,16 +196,25 @@ const InputBoxComponent = () => {
 
     // If input starts with "/" and there are multiple suggestions, use arrow keys for command dropdown
     if (currentInput.startsWith("/") && dropdownSuggestions.length > 1) {
-      if (key.upArrow) {
-        setSelectedIndex((prev) =>
-          prev > 0 ? prev - 1 : dropdownSuggestions.length - 1,
-        );
+      if (key.upArrow && selectedIndex > 0) {
+        setSelectedIndex(selectedIndex - 1);
         return;
       }
-      if (key.downArrow) {
-        setSelectedIndex((prev) =>
-          prev < dropdownSuggestions.length - 1 ? prev + 1 : 0,
-        );
+      if (key.downArrow && selectedIndex < dropdownSuggestions.length - 1) {
+        const newIndex = selectedIndex + 1;
+        setSelectedIndex(newIndex);
+        return;
+      }
+    }
+
+    if (currentInput.startsWith("/") && dropdownSuggestions.length === 1) {
+      const filtered = dynamicSuggestions.filter((s) =>
+        s.startsWith(currentInput),
+      );
+      const isModelArg =
+        dropdownSuggestions[0]?.usage.includes("<model-name>") ?? false;
+      if (isModelArg && filtered.length > 0) {
+        setGhostIndex((ghostIndex) => (ghostIndex + 1) % filtered.length);
         return;
       }
     }
@@ -181,24 +223,28 @@ const InputBoxComponent = () => {
     if (isFileMode && fileDropdownSuggestions.length > 1) {
       const listLen = fileDropdownSuggestions.length;
       if (key.upArrow) {
-        const newIndex = selectedIndex > 0 ? selectedIndex - 1 : listLen - 1;
-        setSelectedIndex(newIndex);
-        if (newIndex < scrollOffset) {
-          setScrollOffset(newIndex);
-        } else if (newIndex >= scrollOffset + MAX_VISIBLE_SUGGESTIONS) {
-          setScrollOffset(newIndex - MAX_VISIBLE_SUGGESTIONS + 1);
+        const newIndex = selectedIndex - 1;
+        if (newIndex >= 0) {
+          setSelectedIndex(newIndex);
+          if (newIndex < scrollOffset) {
+            setScrollOffset(newIndex);
+          } else if (newIndex >= scrollOffset + MAX_VISIBLE_SUGGESTIONS) {
+            setScrollOffset(newIndex - MAX_VISIBLE_SUGGESTIONS + 1);
+          }
+          return;
         }
-        return;
       }
       if (key.downArrow) {
-        const newIndex = selectedIndex < listLen - 1 ? selectedIndex + 1 : 0;
-        setSelectedIndex(newIndex);
-        if (newIndex >= scrollOffset + MAX_VISIBLE_SUGGESTIONS) {
-          setScrollOffset(newIndex - MAX_VISIBLE_SUGGESTIONS + 1);
-        } else if (newIndex < scrollOffset) {
-          setScrollOffset(newIndex);
+        const newIndex = selectedIndex + 1;
+        if (newIndex < listLen) {
+          setSelectedIndex(newIndex);
+          if (newIndex >= scrollOffset + MAX_VISIBLE_SUGGESTIONS) {
+            setScrollOffset(newIndex - MAX_VISIBLE_SUGGESTIONS + 1);
+          } else if (newIndex < scrollOffset) {
+            setScrollOffset(newIndex);
+          }
+          return;
         }
-        return;
       }
     }
 
@@ -239,6 +285,7 @@ const InputBoxComponent = () => {
     setCurrentInput(value);
     setSelectedIndex(0);
     setScrollOffset(0);
+    setGhostIndex(0);
   }, []);
 
   const processSubmit = () => {
@@ -279,7 +326,9 @@ const InputBoxComponent = () => {
             key={inputKey}
             placeholder="Type a command or ask a question..."
             onChange={handleChange}
-            suggestions={dynamicSuggestions}
+            suggestions={dynamicSuggestions.filter(
+              (s) => !hiddenSuggestions.has(s),
+            )}
             defaultValue={currentInput}
             onSubmit={processSubmit}
           />

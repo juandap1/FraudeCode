@@ -10,6 +10,7 @@ import MistralClient from "@/services/mistral";
 import CerebrasClient from "@/services/cerebras";
 import GoogleClient from "@/services/google";
 import CommandCenter from "@/commands";
+import { getKnowledgeOrchestrator } from "@/services/knowledgeOrchestrator";
 
 // Global error handlers to catch and suppress AbortErrors
 process.on("unhandledRejection", (reason) => {
@@ -79,6 +80,11 @@ async function main() {
   await CommandCenter.loadPlugins();
   syncModels();
   const { waitUntilExit } = render(<App />, { exitOnCtrlC: false });
+
+  // Background index the project (fire-and-forget)
+  getKnowledgeOrchestrator()
+    .indexProject(process.cwd())
+    .catch((e: Error) => log(`Background indexing failed: ${e}`));
 
   // Handle graceful exit
   const exitHandler = () => {

@@ -1,7 +1,7 @@
 import { Box, Text, useInput } from "ink";
 import { THEME } from "../../theme";
 import { BunApiRouter } from "../../utils/router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface InteractiveServerViewProps {
   routerId: string;
@@ -15,6 +15,14 @@ export default function InteractiveServerView({
   // Retrieve the router instance to get details (like port)
   const router = BunApiRouter.getRouter(routerId);
   const port = router?.port || 3000;
+
+  useEffect(() => {
+    if (router) {
+      router.onStop = () => {
+        setStopped(true);
+      };
+    }
+  }, [router]);
 
   useInput((input, key) => {
     if (stopped) return;

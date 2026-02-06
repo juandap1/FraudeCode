@@ -38,7 +38,7 @@ interface FraudeStore {
 }
 
 const useFraudeStore = create<FraudeStore>((set, get) => ({
-  executionMode: 0,
+  executionMode: 0 as 0 | 1 | 2,
   outputItems: [],
   started: false,
   status: 0,
@@ -59,24 +59,12 @@ const useFraudeStore = create<FraudeStore>((set, get) => ({
       }
     }
   },
-  updateOutput: (type, content, config) => {
+  updateOutput: (type, rawContent, config) => {
     set((state) => {
       const outputItems = [...state.outputItems];
       const latestOutput = outputItems[outputItems.length - 1];
-      let extraChanges = {};
-      // if (type === "checkpoint") {
-      //   let elapsed = state.elapsedTime - state.lastBreak;
-      //   extraChanges = {
-      //     lastBreak: state.elapsedTime,
-      //   };
-      //   content += ` · (${(elapsed / 10).toFixed(1)}s)`;
-      // }
-      const dontOverrideType = new Set([
-        "log",
-        "checkpoint",
-        "interrupted",
-        "command",
-      ]);
+      const dontOverrideType = new Set(["log", "interrupted", "command"]);
+      let content = rawContent.replaceAll(process.cwd(), "@");
       if (
         latestOutput &&
         latestOutput.type === type &&
@@ -98,7 +86,6 @@ const useFraudeStore = create<FraudeStore>((set, get) => ({
       }
       return {
         outputItems,
-        ...extraChanges,
       };
     });
   },

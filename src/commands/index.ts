@@ -47,13 +47,14 @@ class CommandCenter {
     const templates: Command[] = [];
 
     for (const cmd of this.commands) {
+      if (cmd.usage && !cmd.usage.includes("<subcommand>")) {
+        templates.push(cmd);
+      }
       // Add subcommands
       if (cmd.subcommands) {
         for (const sub of cmd.subcommands) {
           templates.push(sub);
         }
-      } else if (cmd.usage && !cmd.usage.includes("<subcommand>")) {
-        templates.push(cmd);
       }
     }
 

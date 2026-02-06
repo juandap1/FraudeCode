@@ -16,9 +16,11 @@ let _fastAgent: Agent | null = null;
  * Use to complete a user request without any planning. Use for simple tasks.
  */
 export function getFastAgent(): Agent {
+  const currentModel = useSettingsStore.getState().primaryModel;
+
   if (!_fastAgent) {
     _fastAgent = new Agent({
-      model: useSettingsStore.getState().primaryModel,
+      model: currentModel,
       systemPrompt: fastAgentPrompt,
       tools: {
         researchSubAgentTool,
@@ -34,6 +36,8 @@ export function getFastAgent(): Agent {
       maxSteps: 20,
       reasoningEffort: "high",
     });
+  } else if (_fastAgent.getModel() !== currentModel) {
+    _fastAgent.setModel(currentModel);
   }
   return _fastAgent;
 }

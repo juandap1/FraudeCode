@@ -15,9 +15,11 @@ let _workerSubAgent: Agent | null = null;
  * Uses lazy initialization to ensure settings are loaded before reading primaryModel.
  */
 export function getWorkerSubAgent(): Agent {
+  const currentModel = useSettingsStore.getState().primaryModel;
+
   if (!_workerSubAgent) {
     _workerSubAgent = new Agent({
-      model: useSettingsStore.getState().primaryModel,
+      model: currentModel,
       systemPrompt: WorkerPrompt,
       tools: {
         readTool,
@@ -31,6 +33,8 @@ export function getWorkerSubAgent(): Agent {
       maxSteps: 10,
       useIsolatedContext: true,
     });
+  } else if (_workerSubAgent.getModel() !== currentModel) {
+    _workerSubAgent.setModel(currentModel);
   }
   return _workerSubAgent;
 }

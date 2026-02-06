@@ -2,6 +2,7 @@ import { structuredPatch } from "diff";
 import { projectPath } from "@/utils";
 import log from "@/utils/logger";
 import { unlink } from "node:fs/promises";
+import AgentCognition from "@/utils/agentCognition";
 
 export interface Hunk {
   oldStart: number;
@@ -122,6 +123,19 @@ class PendingChangesManager {
       await Bun.write(change.path, change.newContent);
       this.changes.delete(id);
       log(`Applied change to ${change.path}`);
+
+      // Index the file to update knowledge graph
+      try {
+        const cognition = AgentCognition.getInstance();
+        await cognition.init();
+        // Fire and forget indexing to avoid blocking UI
+        cognition
+          .indexFile(change.path)
+          .catch((e) => log(`Indexing failed for ${change.path}: ${e}`));
+      } catch (e) {
+        log(`Failed to trigger indexing: ${e}`);
+      }
+
       return true;
     } catch (error) {
       if (change) {
