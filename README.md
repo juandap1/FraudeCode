@@ -61,6 +61,8 @@ Still in dev so just clone the repo and run `bun run dev`
 
 ## Plugins
 
-You can use plugins to extend the functionality of FraudeCode. Check out the [plugins](./plugins) directory for more information.
+You can use plugins to extend the functionality of FraudeCode. Check out the [plugins](./sample-plugins) directory for more information.
 
 I'll be building out some plugins with corresponding UIs for some more fun use cases.
+
+Plugins are automatically loaded on startup from `~/.fraude/plugins` (global) and `./.fraude/plugins` (local). Each plugin folder must contain an `index.ts` file with a default export.
