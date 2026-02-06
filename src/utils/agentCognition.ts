@@ -264,6 +264,19 @@ class AgentCognition {
         if (symbolNode && symbolNode.id !== id) {
           await this.addRelation(id, symbolNode.id, "ABOUT", 1.0);
         }
+      } else if (fact.data?.file && typeof fact.data.file === "string") {
+        // Fallback: Link to file node if no symbol but file is present
+        const fileNode = await this.findFileNode(fact.data.file);
+        if (fileNode && fileNode.id !== id) {
+          await this.addRelation(id, fileNode.id, "ABOUT", 1.0);
+        }
+      } else if (fact.data?.file && typeof fact.data.file === "string") {
+        // Fallback: Link to file node if no symbol but file is present
+        // This catches generic summaries or file-level facts
+        const fileNode = await this.findFileNode(fact.data.file);
+        if (fileNode && fileNode.id !== id) {
+          await this.addRelation(id, fileNode.id, "ABOUT", 1.0);
+        }
       }
 
       // Discover relations to existing facts
@@ -644,39 +657,59 @@ class AgentCognition {
   async findSymbolNode(file: string, symbol: string): Promise<Fact | null> {
     const relFile = path.relative(process.cwd(), file);
     try {
-      // Broaden search to find candidate symbols, then filter strictly in memory
-      // This avoids issues with path formatting/escaping in Cypher
+      // Precise search using both symbol name and file path
+      // This avoids the "floating node" issue where common symbols (e.g. "init")
+      // were missed due to LIMIT clauses on broad queries
+      const symbolFrag = `"symbol":"${symbol}"`;
+      const fileFrag = `"file":"${relFile}"`;
+
       const result = await this.execute(
         `
         MATCH (f:Fact)
-        WHERE f.data CONTAINS $symbol 
+        WHERE f.data CONTAINS $symbolFrag AND f.data CONTAINS $fileFrag
         RETURN f
-        LIMIT 20
+        LIMIT 1
       `,
-        { symbol },
+        { symbolFrag, fileFrag },
       );
 
       const rows = await result.getAll();
 
       if (rows.length > 0) {
-        // Filter in memory to ensure precise match if multiple fuzzy ones returned
-        const match = rows.find((row) => {
-          try {
-            const data = JSON.parse((row.f as any).data);
-            // Strict equality check on parsed JSON
-            // ALSO ensure it is a structural symbol (has kind) to avoid matching the semantic fact itself
-            return data.symbol === symbol && data.file === relFile && data.kind;
-          } catch {
-            return false;
-          }
-        });
-
-        if (match) {
-          return this.parseFact(match.f as Record<string, unknown>);
-        }
+        return this.parseFact(rows[0].f as Record<string, unknown>);
       }
     } catch (e) {
       log(`findSymbolNode error: ${e}`);
+    }
+    return null;
+  }
+
+  /**
+   * Find a file node by path, handling normalization.
+   */
+  async findFileNode(filePath: string): Promise<Fact | null> {
+    const relFile = path.isAbsolute(filePath)
+      ? path.relative(process.cwd(), filePath)
+      : filePath;
+
+    try {
+      const fileFrag = `"file":"${relFile}"`;
+      const result = await this.execute(
+        `
+        MATCH (f:Fact {type: 'file'})
+        WHERE f.data CONTAINS $fileFrag
+        RETURN f
+        LIMIT 1
+      `,
+        { fileFrag },
+      );
+
+      const rows = await result.getAll();
+      if (rows.length > 0) {
+        return this.parseFact(rows[0].f as Record<string, unknown>);
+      }
+    } catch (e) {
+      log(`findFileNode error: ${e}`);
     }
     return null;
   }
