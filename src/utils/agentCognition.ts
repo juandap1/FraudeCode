@@ -337,9 +337,7 @@ class AgentCognition {
       );
       const rows = await result.getAll();
       if (rows.length > 0) {
-        return this.parseFact(
-          (rows[0] as Record<string, unknown>).f as Record<string, unknown>,
-        );
+        return this.parseFact((rows[0] as any).f as Record<string, unknown>);
       }
     } catch (e) {}
 
@@ -362,9 +360,7 @@ class AgentCognition {
         );
         const rows = await result.getAll();
         if (rows.length > 0) {
-          return this.parseFact(
-            (rows[0] as Record<string, unknown>).f as Record<string, unknown>,
-          );
+          return this.parseFact((rows[0] as any).f as Record<string, unknown>);
         }
       }
     } catch (e) {}
@@ -676,7 +672,7 @@ class AgentCognition {
       const rows = await result.getAll();
 
       if (rows.length > 0) {
-        return this.parseFact(rows[0].f as Record<string, unknown>);
+        return this.parseFact((rows[0] as any).f as Record<string, unknown>);
       }
     } catch (e) {
       log(`findSymbolNode error: ${e}`);
@@ -706,7 +702,7 @@ class AgentCognition {
 
       const rows = await result.getAll();
       if (rows.length > 0) {
-        return this.parseFact(rows[0].f as Record<string, unknown>);
+        return this.parseFact((rows[0] as any).f as Record<string, unknown>);
       }
     } catch (e) {
       log(`findFileNode error: ${e}`);

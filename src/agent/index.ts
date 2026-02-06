@@ -6,7 +6,6 @@ export type {
   AgentResponse,
   StructuredAgentResponse,
   ToolCallInfo,
-  ToolResultInfo,
   StepInfo,
   SimpleMessage,
   AgentMessage,

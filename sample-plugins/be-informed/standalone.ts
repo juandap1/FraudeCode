@@ -9,6 +9,7 @@ console.log("Starting informed plugin standalone server...");
 
 const mockContext: PluginContext = {
   log,
+  router: new BunApiRouter(),
   Router: BunApiRouter,
   Agent,
   settings: {
