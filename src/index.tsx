@@ -11,6 +11,8 @@ import CerebrasClient from "@/services/cerebras";
 import GoogleClient from "@/services/google";
 import CommandCenter from "@/commands";
 import { getKnowledgeOrchestrator } from "@/services/knowledgeOrchestrator";
+import { checkForUpdate } from "./utils/updateCheck";
+import { version } from "../package.json";
 
 // Global error handlers to catch and suppress AbortErrors
 process.on("unhandledRejection", (reason) => {
@@ -80,6 +82,13 @@ async function main() {
   await CommandCenter.loadPlugins();
   syncModels();
   const { waitUntilExit } = render(<App />, { exitOnCtrlC: false });
+
+  // Asynchronous update check
+  checkForUpdate(version).then((newVersion) => {
+    if (newVersion) {
+      useSettingsStore.getState().setUpdateAvailable(newVersion);
+    }
+  });
 
   // Background index the project (fire-and-forget)
   getKnowledgeOrchestrator()

@@ -1,6 +1,7 @@
 import { Box, Text } from "ink";
 import Gradient from "ink-gradient";
 import { version } from "../../package.json";
+import useSettingsStore from "../store/useSettingsStore";
 
 const INTRO_THEME = {
   primary: "#FFB6C1",
@@ -66,6 +67,23 @@ export default function IntroComponent() {
             to start your journey...
           </Text>
         </Box>
+        {useSettingsStore((state) => state.updateAvailable) && (
+          <Box
+            marginTop={1}
+            borderStyle="round"
+            borderColor="yellow"
+            paddingX={1}
+          >
+            <Text color="yellow">
+              Update available!{" "}
+              <Text bold>
+                v{useSettingsStore((state) => state.updateAvailable)}
+              </Text>{" "}
+              is now live.
+            </Text>
+            <Text dimColor> Run `npm install -g fraude-code` to update.</Text>
+          </Box>
+        )}
       </Box>
     </Box>
   );

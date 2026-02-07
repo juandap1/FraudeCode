@@ -15,8 +15,10 @@ import rememberCommand from "./remember";
 import knowledgeCommand from "./knowledge";
 import forgetCommand from "./forget";
 import visualizeCommand from "./visualize";
+import updateCommand from "./update";
 
 const COMMANDS: Command[] = [
+  updateCommand,
   usageCommand,
   logCommand,
   serveCommand,
